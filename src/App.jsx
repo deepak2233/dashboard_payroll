@@ -1,56 +1,58 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { doc, onSnapshot, setDoc } from "firebase/firestore";
+import { db } from "./firebase";
 
 const PROJECTS = ["I-Genie", "Lenovo", "Persistent"];
 const uid = () => Math.random().toString(36).slice(2, 9);
 const todayStr = () => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
 const monthKey = (d = new Date()) =>
-    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 const fmt = (a) => "\u20B9" + Number(a || 0).toLocaleString("en-IN");
 const fmtD = (s) => {
-    try {
-        return new Date(s).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
-    } catch {
-        return s;
-    }
+  try {
+    return new Date(s).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+  } catch {
+    return s;
+  }
 };
 const fmtTime = () => new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
 
 const workDays = (yr, mo, holidays = []) => {
-    let c = 0;
-    const d = new Date(yr, mo - 1, 1);
-    while (d.getMonth() === mo - 1) {
-        const w = d.getDay();
-        const ds = `${yr}-${String(mo).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-        if (w !== 0 && w !== 6 && !holidays.includes(ds)) c++;
-        d.setDate(d.getDate() + 1);
-    }
-    return c;
+  let c = 0;
+  const d = new Date(yr, mo - 1, 1);
+  while (d.getMonth() === mo - 1) {
+    const w = d.getDay();
+    const ds = `${yr}-${String(mo).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    if (w !== 0 && w !== 6 && !holidays.includes(ds)) c++;
+    d.setDate(d.getDate() + 1);
+  }
+  return c;
 };
 
 const effDays = (yr, mo, join, exit, holidays = []) => {
-    let c = 0;
-    const d = new Date(yr, mo - 1, 1);
-    const j = join ? new Date(join) : null;
-    const e = exit ? new Date(exit) : null;
-    while (d.getMonth() === mo - 1) {
-        const w = d.getDay();
-        const ds = `${yr}-${String(mo).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-        if (w !== 0 && w !== 6 && !holidays.includes(ds) && (!j || d >= j) && (!e || d <= e)) c++;
-        d.setDate(d.getDate() + 1);
-    }
-    return c;
+  let c = 0;
+  const d = new Date(yr, mo - 1, 1);
+  const j = join ? new Date(join) : null;
+  const e = exit ? new Date(exit) : null;
+  while (d.getMonth() === mo - 1) {
+    const w = d.getDay();
+    const ds = `${yr}-${String(mo).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    if (w !== 0 && w !== 6 && !holidays.includes(ds) && (!j || d >= j) && (!e || d <= e)) c++;
+    d.setDate(d.getDate() + 1);
+  }
+  return c;
 };
 
 const INIT = {
-    employees: [],
-    attendance: {},
-    reports: [],
-    alerts: [],
-    holidays: [],
-    config: { hrBudget: 0, email: "", phone: "", pin: "1205" },
+  employees: [],
+  attendance: {},
+  reports: [],
+  alerts: [],
+  holidays: [],
+  config: { hrBudget: 0, email: "", phone: "", pin: "1205" },
 };
 const SK = "projecthub_data";
 const PC = { "I-Genie": "#a78bfa", Lenovo: "#fb923c", Persistent: "#34d399" };
@@ -60,193 +62,216 @@ const SCYCLE = [undefined, "present", "absent", "leave", "halfday", "wfh"];
 
 /* ── Storage helpers (localStorage only) ── */
 function loadFromStorage() {
-    // Try multiple keys for migration
-    const keys = [SK, "phub4", "phub3", "hub-data-v2", "hub-data"];
-    for (const key of keys) {
-        try {
-            const raw = localStorage.getItem(key);
-            if (!raw) continue;
-            const d = JSON.parse(raw);
-            if (d && d.employees) {
-                if (!d.config) d.config = { ...INIT.config };
-                if (d.config.pin === "1234" || !d.config.pin) d.config.pin = "1205";
-                if (!d.alerts) d.alerts = [];
-                if (!d.holidays) d.holidays = [];
-                if (!d.attendance) d.attendance = {};
-                if (!d.reports) d.reports = [];
-                d.employees = (d.employees || []).map((e) => ({
-                    ...e,
-                    salary: e.salary || e.monthlySalary || 0,
-                    code: e.code || uid().slice(0, 4),
-                }));
-                // Migrate to canonical key
-                if (key !== SK) {
-                    try { localStorage.setItem(SK, JSON.stringify(d)); } catch { }
-                }
-                return d;
-            }
-        } catch { }
-    }
-    return { ...INIT };
+  // Try multiple keys for migration
+  const keys = [SK, "phub4", "phub3", "hub-data-v2", "hub-data"];
+  for (const key of keys) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      const d = JSON.parse(raw);
+      if (d && d.employees) {
+        if (!d.config) d.config = { ...INIT.config };
+        if (d.config.pin === "1234" || !d.config.pin) d.config.pin = "1205";
+        if (!d.alerts) d.alerts = [];
+        if (!d.holidays) d.holidays = [];
+        if (!d.attendance) d.attendance = {};
+        if (!d.reports) d.reports = [];
+        d.employees = (d.employees || []).map((e) => ({
+          ...e,
+          salary: e.salary || e.monthlySalary || 0,
+          code: e.code || uid().slice(0, 4),
+        }));
+        // Migrate to canonical key
+        if (key !== SK) {
+          try { localStorage.setItem(SK, JSON.stringify(d)); } catch { }
+        }
+        return d;
+      }
+    } catch { }
+  }
+  return { ...INIT };
 }
 
 function saveToStorage(data) {
-    try {
-        localStorage.setItem(SK, JSON.stringify(data));
-    } catch (e) {
-        console.error("Save failed:", e);
-    }
+  try {
+    localStorage.setItem(SK, JSON.stringify(data));
+  } catch (e) {
+    console.error("Save failed:", e);
+  }
 }
 
-/* ════════════════════════════════════════ */
-/*  MAIN APP                              */
-/* ════════════════════════════════════════ */
+/* ── Main App ── */
 export default function App() {
-    const [D, setD] = useState(null);
-    const [role, setRole] = useState(null);
-    const [candId, setCandId] = useState(null);
-    const [toast, setToast] = useState(null);
-    const tt = useRef();
+  const [D, setD] = useState(null);
+  const [role, setRole] = useState(null);
+  const [candId, setCandId] = useState(null);
+  const [toast, setToast] = useState(null);
+  const tt = useRef();
 
-    useEffect(() => {
-        setD(loadFromStorage());
-    }, []);
-
-    // Re-read whenever returning to login
-    useEffect(() => {
-        if (role === null && D) {
-            setD(loadFromStorage());
+  // Sync with Firestore
+  useEffect(() => {
+    let unsub = () => { };
+    try {
+      const dRef = doc(db, "data", "projecthub");
+      unsub = onSnapshot(dRef, (snap) => {
+        if (snap.exists()) {
+          const cloudData = snap.data();
+          // Merge/Ensure structure
+          if (cloudData && cloudData.employees) {
+            setD(cloudData);
+            saveToStorage(cloudData); // Fallback sync
+          }
+        } else {
+          // Initialize DB if empty
+          const initial = loadFromStorage();
+          setD(initial);
+          setDoc(dRef, initial);
         }
-    }, [role]);
+      }, (err) => {
+        console.error("Firestore sync error:", err);
+        // Fallback to local
+        setD(loadFromStorage());
+      });
+    } catch (e) {
+      console.error("Firebase init error:", e);
+      setD(loadFromStorage());
+    }
+    return () => unsub();
+  }, []);
 
-    const save = useCallback((nd) => {
-        setD(nd);
-        saveToStorage(nd);
-    }, []);
+  const save = useCallback(async (nd) => {
+    setD(nd);
+    saveToStorage(nd); // Local fallback
+    try {
+      await setDoc(doc(db, "data", "projecthub"), nd);
+    } catch (e) {
+      console.error("Cloud save failed:", e);
+    }
+  }, []);
 
-    const notify = (msg, type = "ok") => {
-        clearTimeout(tt.current);
-        setToast({ msg, type });
-        tt.current = setTimeout(() => setToast(null), 2800);
-    };
+  const notify = (msg, type = "ok") => {
+    clearTimeout(tt.current);
+    setToast({ msg, type });
+    tt.current = setTimeout(() => setToast(null), 2800);
+  };
 
-    const pushAlert = (d, alert) => ({
-        ...d,
-        alerts: [{ ...alert, id: uid(), ts: new Date().toISOString(), read: false }, ...(d.alerts || [])],
-    });
+  const pushAlert = (d, alert) => ({
+    ...d,
+    alerts: [{ ...alert, id: uid(), ts: new Date().toISOString(), read: false }, ...(d.alerts || [])],
+  });
 
-    if (!D) return <LoadingScreen />;
-    if (!role)
-        return <LoginScreen D={D} save={save} setRole={setRole} setCandId={setCandId} notify={notify} />;
-    if (role === "candidate")
-        return (
-            <CandidatePortal
-                D={D} save={save} candId={candId} pushAlert={pushAlert}
-                notify={notify} setRole={setRole} setCandId={setCandId} toast={toast}
-            />
-        );
-    return <OwnerPanel D={D} save={save} pushAlert={pushAlert} notify={notify} setRole={setRole} toast={toast} />;
+  if (!D) return <LoadingScreen />;
+  if (!role)
+    return <LoginScreen D={D} save={save} setRole={setRole} setCandId={setCandId} notify={notify} />;
+  if (role === "candidate")
+    return (
+      <CandidatePortal
+        D={D} save={save} candId={candId} pushAlert={pushAlert}
+        notify={notify} setRole={setRole} setCandId={setCandId} toast={toast}
+      />
+    );
+  return <OwnerPanel D={D} save={save} pushAlert={pushAlert} notify={notify} setRole={setRole} toast={toast} />;
 }
 
 /* ════════════════════════════════════════ */
 /*  LOADING                               */
 /* ════════════════════════════════════════ */
 function LoadingScreen() {
-    return (
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", background: "#080c14", color: "#8899b4", fontFamily: "'DM Sans',sans-serif" }}>
-            <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-            <div style={{ textAlign: "center" }}>
-                <div style={{ width: 36, height: 36, border: "3px solid #1c2640", borderTopColor: "#6366f1", borderRadius: "50%", animation: "spin .7s linear infinite", margin: "0 auto 14px" }} />
-                <p>Loading...</p>
-            </div>
-        </div>
-    );
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", background: "#080c14", color: "#8899b4", fontFamily: "'DM Sans',sans-serif" }}>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+      <div style={{ textAlign: "center" }}>
+        <div style={{ width: 36, height: 36, border: "3px solid #1c2640", borderTopColor: "#6366f1", borderRadius: "50%", animation: "spin .7s linear infinite", margin: "0 auto 14px" }} />
+        <p>Loading...</p>
+      </div>
+    </div>
+  );
 }
 
 /* ════════════════════════════════════════ */
 /*  LOGIN                                 */
 /* ════════════════════════════════════════ */
 function LoginScreen({ D, save, setRole, setCandId, notify }) {
-    const [mode, setMode] = useState(null);
-    const [pin, setPin] = useState("");
-    const [selEmp, setSelEmp] = useState("");
-    const [empCode, setEmpCode] = useState("");
-    const [pinErr, setPinErr] = useState(false);
-    const E = D.employees || [];
+  const [mode, setMode] = useState(null);
+  const [pin, setPin] = useState("");
+  const [selEmp, setSelEmp] = useState("");
+  const [empCode, setEmpCode] = useState("");
+  const [pinErr, setPinErr] = useState(false);
+  const E = D.employees || [];
 
-    const ownerLogin = () => {
-        if (pin === (D.config?.pin || "1205")) setRole("owner");
-        else { setPinErr(true); setTimeout(() => setPinErr(false), 1500); }
-    };
+  const ownerLogin = () => {
+    if (pin === (D.config?.pin || "1205")) setRole("owner");
+    else { setPinErr(true); setTimeout(() => setPinErr(false), 1500); }
+  };
 
-    const candLogin = () => {
-        const emp = E.find((e) => e.id === selEmp);
-        if (emp && empCode === (emp.code || emp.id.slice(0, 4))) { setCandId(emp.id); setRole("candidate"); }
-        else { setPinErr(true); setTimeout(() => setPinErr(false), 1500); }
-    };
+  const candLogin = () => {
+    const emp = E.find((e) => e.id === selEmp);
+    if (emp && empCode === (emp.code || emp.id.slice(0, 4))) { setCandId(emp.id); setRole("candidate"); }
+    else { setPinErr(true); setTimeout(() => setPinErr(false), 1500); }
+  };
 
-    return (
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", background: "#080c14", fontFamily: "'DM Sans',sans-serif", color: "#e8edf5" }}>
-            <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", background: "#080c14", fontFamily: "'DM Sans',sans-serif", color: "#e8edf5" }}>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');
 @keyframes spin{to{transform:rotate(360deg)}}@keyframes fadeIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
 @keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
 button:hover{filter:brightness(1.12);}`}</style>
-            <div style={{ width: 400, animation: "fadeIn .4s ease" }}>
-                <div style={{ textAlign: "center", marginBottom: 36 }}>
-                    <div style={{ width: 64, height: 64, borderRadius: 16, background: "linear-gradient(135deg,#6366f1,#a78bfa)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px", fontSize: 28, fontWeight: 700 }}>P</div>
-                    <h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, letterSpacing: -.5 }}>ProjectHub</h1>
-                    <p style={{ color: "#5a6b85", fontSize: 13, marginTop: 6 }}>Workforce Management Platform</p>
-                </div>
-                {!mode && (
-                    <div>
-                        <button onClick={() => setMode("owner")} style={{ width: "100%", padding: "18px 20px", borderRadius: 12, border: "1px solid #1c2640", background: "#0f1520", color: "#e8edf5", cursor: "pointer", marginBottom: 12, display: "flex", alignItems: "center", gap: 14, textAlign: "left", fontFamily: "inherit" }}>
-                            <span style={{ width: 44, height: 44, borderRadius: 10, background: "#6366f120", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>👑</span>
-                            <div><div style={{ fontSize: 15, fontWeight: 600 }}>Owner / Admin</div><div style={{ fontSize: 11, color: "#5a6b85", marginTop: 2 }}>Full access — Dashboard, People, Payroll, Alerts</div></div>
-                        </button>
-                        <button onClick={() => setMode("candidate")} style={{ width: "100%", padding: "18px 20px", borderRadius: 12, border: "1px solid #1c2640", background: "#0f1520", color: "#e8edf5", cursor: "pointer", display: "flex", alignItems: "center", gap: 14, textAlign: "left", fontFamily: "inherit" }}>
-                            <span style={{ width: 44, height: 44, borderRadius: 10, background: "#22c55e20", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>👤</span>
-                            <div><div style={{ fontSize: 15, fontWeight: 600 }}>Team Member</div><div style={{ fontSize: 11, color: "#5a6b85", marginTop: 2 }}>Mark attendance & submit weekly reports only</div></div>
-                        </button>
-                    </div>
-                )}
-                {mode === "owner" && (
-                    <div style={{ background: "#0f1520", borderRadius: 14, border: "1px solid #1c2640", padding: 24, animation: pinErr ? "shake .3s" : "fadeIn .3s" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 20 }}>
-                            <button onClick={() => setMode(null)} style={{ background: "none", border: "none", color: "#5a6b85", cursor: "pointer", fontSize: 16 }}>&larr;</button>
-                            <h3 style={{ margin: 0, fontSize: 16 }}>👑 Owner Login</h3>
-                        </div>
-                        <label style={{ display: "block", fontSize: 12, color: "#8899b4", marginBottom: 4 }}>Admin PIN</label>
-                        <input type="password" maxLength={8} value={pin} onChange={(e) => setPin(e.target.value)} onKeyDown={(e) => e.key === "Enter" && ownerLogin()} placeholder="Enter PIN" style={{ width: "100%", padding: "12px 14px", borderRadius: 8, border: `1px solid ${pinErr ? "#ef4444" : "#1c2640"}`, background: "#151d2e", color: "#e8edf5", fontSize: 16, letterSpacing: 4, textAlign: "center", outline: "none", boxSizing: "border-box", marginBottom: 4 }} />
-                        {pinErr && <p style={{ color: "#ef4444", fontSize: 11, margin: "4px 0 0", textAlign: "center" }}>Incorrect PIN</p>}
-                        <button onClick={ownerLogin} style={{ width: "100%", padding: "12px", borderRadius: 8, border: "none", background: "#6366f1", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", marginTop: 14, fontFamily: "inherit" }}>Login</button>
-                    </div>
-                )}
-                {mode === "candidate" && (
-                    <div style={{ background: "#0f1520", borderRadius: 14, border: "1px solid #1c2640", padding: 24, animation: pinErr ? "shake .3s" : "fadeIn .3s" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 20 }}>
-                            <button onClick={() => setMode(null)} style={{ background: "none", border: "none", color: "#5a6b85", cursor: "pointer", fontSize: 16 }}>&larr;</button>
-                            <h3 style={{ margin: 0, fontSize: 16 }}>👤 Team Member Login</h3>
-                        </div>
-                        {E.length === 0 ? (
-                            <p style={{ color: "#5a6b85", fontSize: 13, textAlign: "center", padding: 20 }}>No team members registered yet. Ask your admin to add you first.</p>
-                        ) : (
-                            <>
-                                <label style={lblStyle}>Select Your Name</label>
-                                <select value={selEmp} onChange={(e) => setSelEmp(e.target.value)} style={{ ...inputStyle, width: "100%", marginBottom: 14 }}>
-                                    <option value="">— Choose —</option>
-                                    {E.map((e) => <option key={e.id} value={e.id}>{e.name} ({e.project})</option>)}
-                                </select>
-                                <label style={lblStyle}>Access Code</label>
-                                <input value={empCode} onChange={(e) => setEmpCode(e.target.value)} onKeyDown={(e) => e.key === "Enter" && candLogin()} placeholder="Your access code" style={{ ...inputStyle, width: "100%", textAlign: "center" }} />
-                                {pinErr && <p style={{ color: "#ef4444", fontSize: 11, margin: "4px 0 0", textAlign: "center" }}>Invalid code</p>}
-                                <button onClick={candLogin} disabled={!selEmp} style={{ width: "100%", padding: "12px", borderRadius: 8, border: "none", background: "#22c55e", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", marginTop: 14, fontFamily: "inherit", opacity: selEmp ? 1 : 0.5 }}>Login</button>
-                            </>
-                        )}
-                    </div>
-                )}
-            </div>
+      <div style={{ width: 400, animation: "fadeIn .4s ease" }}>
+        <div style={{ textAlign: "center", marginBottom: 36 }}>
+          <div style={{ width: 64, height: 64, borderRadius: 16, background: "linear-gradient(135deg,#6366f1,#a78bfa)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px", fontSize: 28, fontWeight: 700 }}>P</div>
+          <h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, letterSpacing: -.5 }}>ProjectHub</h1>
+          <p style={{ color: "#5a6b85", fontSize: 13, marginTop: 6 }}>Workforce Management Platform</p>
         </div>
-    );
+        {!mode && (
+          <div>
+            <button onClick={() => setMode("owner")} style={{ width: "100%", padding: "18px 20px", borderRadius: 12, border: "1px solid #1c2640", background: "#0f1520", color: "#e8edf5", cursor: "pointer", marginBottom: 12, display: "flex", alignItems: "center", gap: 14, textAlign: "left", fontFamily: "inherit" }}>
+              <span style={{ width: 44, height: 44, borderRadius: 10, background: "#6366f120", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>👑</span>
+              <div><div style={{ fontSize: 15, fontWeight: 600 }}>Owner / Admin</div><div style={{ fontSize: 11, color: "#5a6b85", marginTop: 2 }}>Full access — Dashboard, People, Payroll, Alerts</div></div>
+            </button>
+            <button onClick={() => setMode("candidate")} style={{ width: "100%", padding: "18px 20px", borderRadius: 12, border: "1px solid #1c2640", background: "#0f1520", color: "#e8edf5", cursor: "pointer", display: "flex", alignItems: "center", gap: 14, textAlign: "left", fontFamily: "inherit" }}>
+              <span style={{ width: 44, height: 44, borderRadius: 10, background: "#22c55e20", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>👤</span>
+              <div><div style={{ fontSize: 15, fontWeight: 600 }}>Team Member</div><div style={{ fontSize: 11, color: "#5a6b85", marginTop: 2 }}>Mark attendance & submit weekly reports only</div></div>
+            </button>
+          </div>
+        )}
+        {mode === "owner" && (
+          <div style={{ background: "#0f1520", borderRadius: 14, border: "1px solid #1c2640", padding: 24, animation: pinErr ? "shake .3s" : "fadeIn .3s" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 20 }}>
+              <button onClick={() => setMode(null)} style={{ background: "none", border: "none", color: "#5a6b85", cursor: "pointer", fontSize: 16 }}>&larr;</button>
+              <h3 style={{ margin: 0, fontSize: 16 }}>👑 Owner Login</h3>
+            </div>
+            <label style={{ display: "block", fontSize: 12, color: "#8899b4", marginBottom: 4 }}>Admin PIN</label>
+            <input type="password" maxLength={8} value={pin} onChange={(e) => setPin(e.target.value)} onKeyDown={(e) => e.key === "Enter" && ownerLogin()} placeholder="Enter PIN" style={{ width: "100%", padding: "12px 14px", borderRadius: 8, border: `1px solid ${pinErr ? "#ef4444" : "#1c2640"}`, background: "#151d2e", color: "#e8edf5", fontSize: 16, letterSpacing: 4, textAlign: "center", outline: "none", boxSizing: "border-box", marginBottom: 4 }} />
+            {pinErr && <p style={{ color: "#ef4444", fontSize: 11, margin: "4px 0 0", textAlign: "center" }}>Incorrect PIN</p>}
+            <button onClick={ownerLogin} style={{ width: "100%", padding: "12px", borderRadius: 8, border: "none", background: "#6366f1", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", marginTop: 14, fontFamily: "inherit" }}>Login</button>
+          </div>
+        )}
+        {mode === "candidate" && (
+          <div style={{ background: "#0f1520", borderRadius: 14, border: "1px solid #1c2640", padding: 24, animation: pinErr ? "shake .3s" : "fadeIn .3s" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 20 }}>
+              <button onClick={() => setMode(null)} style={{ background: "none", border: "none", color: "#5a6b85", cursor: "pointer", fontSize: 16 }}>&larr;</button>
+              <h3 style={{ margin: 0, fontSize: 16 }}>👤 Team Member Login</h3>
+            </div>
+            {E.length === 0 ? (
+              <p style={{ color: "#5a6b85", fontSize: 13, textAlign: "center", padding: 20 }}>No team members registered yet. Ask your admin to add you first.</p>
+            ) : (
+              <>
+                <label style={lblStyle}>Select Your Name</label>
+                <select value={selEmp} onChange={(e) => setSelEmp(e.target.value)} style={{ ...inputStyle, width: "100%", marginBottom: 14 }}>
+                  <option value="">— Choose —</option>
+                  {E.map((e) => <option key={e.id} value={e.id}>{e.name} ({e.project})</option>)}
+                </select>
+                <label style={lblStyle}>Access Code</label>
+                <input value={empCode} onChange={(e) => setEmpCode(e.target.value)} onKeyDown={(e) => e.key === "Enter" && candLogin()} placeholder="Your access code" style={{ ...inputStyle, width: "100%", textAlign: "center" }} />
+                {pinErr && <p style={{ color: "#ef4444", fontSize: 11, margin: "4px 0 0", textAlign: "center" }}>Invalid code</p>}
+                <button onClick={candLogin} disabled={!selEmp} style={{ width: "100%", padding: "12px", borderRadius: 8, border: "none", background: "#22c55e", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", marginTop: 14, fontFamily: "inherit", opacity: selEmp ? 1 : 0.5 }}>Login</button>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 /* ════════════════════════════════════════ */
@@ -606,11 +631,13 @@ function OwnerPanel({ D, save, pushAlert, notify, setRole, toast }) {
             {dates.map((d) => <th key={d.day} style={{ padding: "3px 1px", textAlign: "center", color: d.isWE ? "#5a6b8530" : d.isHol ? "#ec4899" : "#8899b4", minWidth: 28, fontSize: 8 }}><div>{d.dn[0]}</div><div style={{ fontWeight: 700, fontSize: 10 }}>{d.day}</div></th>)}
             <th style={{ padding: "5px", textAlign: "center", color: "#22c55e", minWidth: 30, fontSize: 9, position: "sticky", right: 0, background: "#151d2e" }}>Eff</th>
           </tr></thead>
-          <tbody>{FE.map((emp, ei) => { const st = getStats(emp.id, mo); return (<tr key={emp.id} style={{ background: ei % 2 === 0 ? "#0f1520" : "#080c14" }}>
-            <td style={{ position: "sticky", left: 0, background: ei % 2 === 0 ? "#0f1520" : "#080c14", zIndex: 1, padding: "6px 10px", fontWeight: 500, color: "#e8edf5", fontSize: 11 }}>{emp.name}<div style={{ fontSize: 8, color: "#5a6b85" }}>{emp.project}</div></td>
-            {dates.map((d) => { const v = D.attendance[`${emp.id}_${d.date}`]; const isOff = d.isWE || d.isHol; return (<td key={d.day} style={{ textAlign: "center", padding: 1, opacity: isOff && !v ? 0.2 : 1 }}><button onClick={() => { if (!d.isWE) markAtt(emp.id, d.date, SCYCLE[(SCYCLE.indexOf(v) + 1) % SCYCLE.length]); }} style={{ width: 22, height: 22, borderRadius: 3, border: d.isHol && !v ? "1px dashed #ec4899" : "none", cursor: d.isWE ? "default" : "pointer", fontSize: 8, fontWeight: 700, background: v ? SC[v] + "20" : "transparent", color: v ? SC[v] : "#5a6b85", padding: 0, lineHeight: "22px" }}>{v ? SL[v] : d.isHol ? "H" : "·"}</button></td>); })}
-            <td style={{ textAlign: "center", fontWeight: 700, color: "#22c55e", fontSize: 12, position: "sticky", right: 0, background: ei % 2 === 0 ? "#0f1520" : "#080c14" }}>{st.effective}</td>
-          </tr>); })}</tbody>
+          <tbody>{FE.map((emp, ei) => {
+            const st = getStats(emp.id, mo); return (<tr key={emp.id} style={{ background: ei % 2 === 0 ? "#0f1520" : "#080c14" }}>
+              <td style={{ position: "sticky", left: 0, background: ei % 2 === 0 ? "#0f1520" : "#080c14", zIndex: 1, padding: "6px 10px", fontWeight: 500, color: "#e8edf5", fontSize: 11 }}>{emp.name}<div style={{ fontSize: 8, color: "#5a6b85" }}>{emp.project}</div></td>
+              {dates.map((d) => { const v = D.attendance[`${emp.id}_${d.date}`]; const isOff = d.isWE || d.isHol; return (<td key={d.day} style={{ textAlign: "center", padding: 1, opacity: isOff && !v ? 0.2 : 1 }}><button onClick={() => { if (!d.isWE) markAtt(emp.id, d.date, SCYCLE[(SCYCLE.indexOf(v) + 1) % SCYCLE.length]); }} style={{ width: 22, height: 22, borderRadius: 3, border: d.isHol && !v ? "1px dashed #ec4899" : "none", cursor: d.isWE ? "default" : "pointer", fontSize: 8, fontWeight: 700, background: v ? SC[v] + "20" : "transparent", color: v ? SC[v] : "#5a6b85", padding: 0, lineHeight: "22px" }}>{v ? SL[v] : d.isHol ? "H" : "·"}</button></td>); })}
+              <td style={{ textAlign: "center", fontWeight: 700, color: "#22c55e", fontSize: 12, position: "sticky", right: 0, background: ei % 2 === 0 ? "#0f1520" : "#080c14" }}>{st.effective}</td>
+            </tr>);
+          })}</tbody>
         </table></div>}
       {modal === "addHol" && <Mod title="Add Holiday" onClose={() => setModal(null)}><Inp label="Date" type="date" id="hd" /><Inp label="Name" id="hn" placeholder="Diwali..." /><Bt onClick={() => { const d = document.getElementById("hd").value; const n = document.getElementById("hn").value; if (d && n) { addHoliday(d, n); setModal(null); } }} s={{ width: "100%" }}>Add</Bt></Mod>}
     </div>);
@@ -638,28 +665,30 @@ function OwnerPanel({ D, save, pushAlert, notify, setRole, toast }) {
       <div style={{ background: "linear-gradient(135deg,#1e1b4b,#0f1520 70%)", borderRadius: 12, padding: 18, marginBottom: 16, border: "1px solid #1c2640", display: "flex", justifyContent: "space-around", textAlign: "center", flexWrap: "wrap", gap: 12 }}>
         {[["Working Days", wd, "#6366f1"], ["Earned", fmt(totalNet), "#22c55e"], hr > 0 && ["HR", fmt(hr), "#ec4899"], ["Total", fmt(grand), "#eab308"]].filter(Boolean).map(([l, v, c], i) => (<div key={i}><div style={{ fontSize: 9, color: "#5a6b85", textTransform: "uppercase", letterSpacing: 1 }}>{l}</div><div style={{ fontSize: 22, fontWeight: 700, color: c, marginTop: 3 }}>{v}</div></div>))}
       </div>
-      {PROJECTS.map((pr) => { const pe = all.filter((x) => x.e.project === pr); if (!pe.length) return null; const pt = pe.reduce((s, x) => s + x.s.net, 0); const hs = hr > 0 ? Math.round(hr / PROJECTS.length) : 0;
+      {PROJECTS.map((pr) => {
+        const pe = all.filter((x) => x.e.project === pr); if (!pe.length) return null; const pt = pe.reduce((s, x) => s + x.s.net, 0); const hs = hr > 0 ? Math.round(hr / PROJECTS.length) : 0;
         return (<Cd key={pr} s={{ marginBottom: 12 }}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
           <h4 style={{ margin: 0, color: "#e8edf5", fontSize: 13 }}><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: PC[pr], marginRight: 6 }} />{pr} ({pe.length})</h4>
           <span style={{ fontSize: 12, color: "#8899b4" }}>Pay: <strong style={{ color: "#22c55e" }}>{fmt(pt)}</strong>{hs > 0 && <span style={{ color: "#5a6b85", fontSize: 10 }}> +HR {fmt(hs)}</span>}</span>
         </div>
-        <div style={{ overflowX: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
-          <thead><tr>{["Name", "Gross", "Days", "Attendance", "Per Day", "Net", "Flags"].map((h) => <th key={h} style={{ padding: "6px 8px", textAlign: "left", color: "#5a6b85", fontSize: 9, textTransform: "uppercase", borderBottom: "1px solid #1c2640" }}>{h}</th>)}</tr></thead>
-          <tbody>{pe.map(({ e: emp, s: sal }) => (<tr key={emp.id} style={{ borderBottom: "1px solid #1c2640" }}>
-            <td style={{ padding: "8px", color: "#e8edf5", fontWeight: 500, fontSize: 12 }}>{emp.name}</td>
-            <td style={{ padding: "8px", color: "#8899b4" }}>{fmt(emp.salary)}</td>
-            <td style={{ padding: "8px" }}><span style={{ color: "#22c55e", fontWeight: 600 }}>{sal.effective}</span><span style={{ color: "#5a6b85" }}>/{sal.empWD}</span></td>
-            <td style={{ padding: "8px" }}><div style={{ display: "flex", gap: 3, fontSize: 9 }}>
-              {sal.present > 0 && <span style={{ color: SC.present }}>{sal.present}P</span>}{sal.wfh > 0 && <span style={{ color: SC.wfh }}>{sal.wfh}W</span>}{sal.halfday > 0 && <span style={{ color: SC.halfday }}>{sal.halfday}H</span>}{sal.absent > 0 && <span style={{ color: SC.absent }}>{sal.absent}A</span>}{sal.leave > 0 && <span style={{ color: SC.leave }}>{sal.leave}L</span>}
-            </div><div style={{ height: 3, background: "#1c2640", borderRadius: 2, marginTop: 3, width: 55 }}><div style={{ height: "100%", width: `${sal.attPct}%`, background: sal.attPct >= 90 ? "#22c55e" : sal.attPct >= 70 ? "#eab308" : "#ef4444", borderRadius: 2 }} /></div></td>
-            <td style={{ padding: "8px", color: "#8899b4" }}>{fmt(sal.perDay)}</td>
-            <td style={{ padding: "8px", color: "#22c55e", fontWeight: 700 }}>{fmt(sal.net)}</td>
-            <td style={{ padding: "8px" }}><div style={{ display: "flex", gap: 3 }}>
-              {sal.isProRata && <Bg color="#06b6d4" s={{ fontSize: 8, padding: "1px 5px" }}>Pro-rata</Bg>}
-              {sal.attPct > 0 && sal.attPct < 70 && <Bg color="#ef4444" s={{ fontSize: 8, padding: "1px 5px" }}>Low</Bg>}
-            </div></td>
-          </tr>))}</tbody>
-        </table></div></Cd>); })}
+          <div style={{ overflowX: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+            <thead><tr>{["Name", "Gross", "Days", "Attendance", "Per Day", "Net", "Flags"].map((h) => <th key={h} style={{ padding: "6px 8px", textAlign: "left", color: "#5a6b85", fontSize: 9, textTransform: "uppercase", borderBottom: "1px solid #1c2640" }}>{h}</th>)}</tr></thead>
+            <tbody>{pe.map(({ e: emp, s: sal }) => (<tr key={emp.id} style={{ borderBottom: "1px solid #1c2640" }}>
+              <td style={{ padding: "8px", color: "#e8edf5", fontWeight: 500, fontSize: 12 }}>{emp.name}</td>
+              <td style={{ padding: "8px", color: "#8899b4" }}>{fmt(emp.salary)}</td>
+              <td style={{ padding: "8px" }}><span style={{ color: "#22c55e", fontWeight: 600 }}>{sal.effective}</span><span style={{ color: "#5a6b85" }}>/{sal.empWD}</span></td>
+              <td style={{ padding: "8px" }}><div style={{ display: "flex", gap: 3, fontSize: 9 }}>
+                {sal.present > 0 && <span style={{ color: SC.present }}>{sal.present}P</span>}{sal.wfh > 0 && <span style={{ color: SC.wfh }}>{sal.wfh}W</span>}{sal.halfday > 0 && <span style={{ color: SC.halfday }}>{sal.halfday}H</span>}{sal.absent > 0 && <span style={{ color: SC.absent }}>{sal.absent}A</span>}{sal.leave > 0 && <span style={{ color: SC.leave }}>{sal.leave}L</span>}
+              </div><div style={{ height: 3, background: "#1c2640", borderRadius: 2, marginTop: 3, width: 55 }}><div style={{ height: "100%", width: `${sal.attPct}%`, background: sal.attPct >= 90 ? "#22c55e" : sal.attPct >= 70 ? "#eab308" : "#ef4444", borderRadius: 2 }} /></div></td>
+              <td style={{ padding: "8px", color: "#8899b4" }}>{fmt(sal.perDay)}</td>
+              <td style={{ padding: "8px", color: "#22c55e", fontWeight: 700 }}>{fmt(sal.net)}</td>
+              <td style={{ padding: "8px" }}><div style={{ display: "flex", gap: 3 }}>
+                {sal.isProRata && <Bg color="#06b6d4" s={{ fontSize: 8, padding: "1px 5px" }}>Pro-rata</Bg>}
+                {sal.attPct > 0 && sal.attPct < 70 && <Bg color="#ef4444" s={{ fontSize: 8, padding: "1px 5px" }}>Low</Bg>}
+              </div></td>
+            </tr>))}</tbody>
+          </table></div></Cd>);
+      })}
       {modal === "payConf" && <Mod title="⚙ Payroll Config" onClose={() => setModal(null)}>
         <Inp label="Your Email" defaultValue={D.config?.email || ""} id="cfe" placeholder="deepak@company.com" />
         <Inp label="Phone (SMS)" defaultValue={D.config?.phone || ""} id="cfp" placeholder="+91 98765 43210" />
