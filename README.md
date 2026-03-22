@@ -1,11 +1,3 @@
-# ProjectHub — Workforce Management Platform
-
-Role-based management for attendance, weekly reports, and payroll across I-Genie, Lenovo, and Persistent.
-
-## Login
-
-- **Owner**: PIN `1205` (changeable in Config)
-- **Team Member**: Select name + enter 4-char access code (shown in Owner Dashboard)
 
 ## Deploy to Vercel
 
