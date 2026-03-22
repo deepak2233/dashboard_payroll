@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { supabase } from "./supabase";
+import { supabase, isSupabaseConfigured } from "./supabase";
 
 const PROJECTS = ["I-Genie", "Lenovo", "Persistent"];
 const uid = () => Math.random().toString(36).slice(2, 9);
@@ -109,6 +109,11 @@ export default function App() {
 
   // Sync with Supabase
   useEffect(() => {
+    if (!isSupabaseConfigured) {
+      setD(loadFromStorage());
+      return;
+    }
+
     const channel = supabase
       .channel('db-changes')
       .on(
@@ -164,6 +169,8 @@ export default function App() {
   const save = useCallback(async (nd) => {
     setD(nd);
     saveToStorage(nd); // Local fallback
+    if (!isSupabaseConfigured) return;
+
     try {
       const { error } = await supabase
         .from('settings')
@@ -185,6 +192,7 @@ export default function App() {
     alerts: [{ ...alert, id: uid(), ts: new Date().toISOString(), read: false }, ...(d.alerts || [])],
   });
 
+  if (!isSupabaseConfigured) return <SetupGuide />;
   if (!D) return <LoadingScreen />;
   if (!role)
     return <LoginScreen D={D} save={save} setRole={setRole} setCandId={setCandId} notify={notify} />;
@@ -201,6 +209,33 @@ export default function App() {
 /* ════════════════════════════════════════ */
 /*  LOADING                               */
 /* ════════════════════════════════════════ */
+/* ════════════════════════════════════════ */
+/*  SETUP GUIDE                           */
+/* ════════════════════════════════════════ */
+function SetupGuide() {
+  return (
+    <div style={{ padding: "40px 20px", display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", background: "#080c14", color: "#e8edf5", fontFamily: "'DM Sans',sans-serif" }}>
+      <div style={{ maxWidth: 500, width: "100%", background: "#0f1520", border: "1px solid #1c2640", borderRadius: 16, padding: 32, textAlign: "center" }}>
+        <div style={{ width: 64, height: 64, borderRadius: 16, background: "#6366f120", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px", fontSize: 32 }}>⚙️</div>
+        <h2 style={{ margin: "0 0 12px", fontSize: 24, fontWeight: 700 }}>Database Configuration Required</h2>
+        <p style={{ color: "#8899b4", fontSize: 14, lineHeight: 1.6, marginBottom: 24 }}>The database sync is ready, but your credentials are missing. Add your Supabase URL and Key to <code>src/supabase.js</code> to start using the app.</p>
+
+        <div style={{ textAlign: "left", background: "#151d2e", borderRadius: 10, padding: 20, marginBottom: 24 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "#6366f1", marginBottom: 12 }}>Next Steps:</div>
+          <ol style={{ margin: 0, paddingLeft: 20, fontSize: 13, color: "#e8edf5", lineHeight: 1.8 }}>
+            <li>Create a project on <b>Supabase.com</b></li>
+            <li>Run the SQL command to create the <code>settings</code> table (see README)</li>
+            <li>Paste your <b>Project URL</b> and <b>Anon Key</b> in <code>src/supabase.js</code></li>
+            <li>Redeploy your application.</li>
+          </ol>
+        </div>
+
+        <button onClick={() => window.location.reload()} style={{ width: "100%", padding: "12px", borderRadius: 8, border: "none", background: "#6366f1", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>I've updated the config, reload</button>
+      </div>
+    </div>
+  );
+}
+
 function LoadingScreen() {
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", background: "#080c14", color: "#8899b4", fontFamily: "'DM Sans',sans-serif" }}>
