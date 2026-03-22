@@ -296,19 +296,19 @@ function CandidatePortal({ D, save, candId, pushAlert, notify, setRole, setCandI
       smsBody: `ProjectHub: ${emp.name} (${emp.project}) marked ${label} on ${fmtD(date)} at ${fmtTime()}.`,
     });
     save(nd);
-    notify(\`Marked \${label} — Admin notified\`);
+    notify(`Marked ${label} — Admin notified`);
   };
 
   const submitReport = (r) => {
     let nd = { ...D, reports: [...D.reports, { ...r, id: uid(), empId: candId, date: todayStr() }] };
     nd = pushAlert(nd, {
       type: "cand_report", icon: "📋",
-      title: \`Weekly Report — \${emp.name}\`,
-      msg: \`\${emp.name} (\${emp.project}) submitted report for \${r.weekOf}.\n\nSummary: \${(r.summary || "").slice(0, 200)}\`,
+      title: `Weekly Report — ${emp.name}`,
+      msg: `${emp.name} (${emp.project}) submitted report for ${r.weekOf}.\n\nSummary: ${(r.summary || "").slice(0, 200)}`,
       sev: "info", project: emp.project, hasEmail: true, hasSMS: true,
-      emailSubject: \`[ProjectHub] Weekly Report: \${emp.name} — \${emp.project} (\${r.weekOf})\`,
-      emailBody: \`Hi,\n\nReport from \${emp.name} (\${emp.project}).\n\nWeek: \${r.weekOf}\nHours: \${r.hours || "N/A"}\n\n--- DONE ---\n\${r.summary}\n\n--- BLOCKERS ---\n\${r.blockers || "None"}\n\n--- NEXT WEEK ---\n\${r.nextWeek || "N/A"}\n\nTime: \${fmtTime()}, \${fmtD(todayStr())}\n\n— ProjectHub\`,
-      smsBody: \`ProjectHub: \${emp.name} (\${emp.project}) submitted weekly report for \${r.weekOf}.\`,
+      emailSubject: `[ProjectHub] Weekly Report: ${emp.name} — ${emp.project} (${r.weekOf})`,
+      emailBody: `Hi,\n\nReport from ${emp.name} (${emp.project}).\n\nWeek: ${r.weekOf}\nHours: ${r.hours || "N/A"}\n\n--- DONE ---\n${r.summary}\n\n--- BLOCKERS ---\n${r.blockers || "None"}\n\n--- NEXT WEEK ---\n${r.nextWeek || "N/A"}\n\nTime: ${fmtTime()}, ${fmtD(todayStr())}\n\n— ProjectHub`,
+      smsBody: `ProjectHub: ${emp.name} (${emp.project}) submitted weekly report for ${r.weekOf}.`,
     });
     save(nd);
     notify("Report submitted — Admin notified!");
@@ -323,7 +323,7 @@ function CandidatePortal({ D, save, candId, pushAlert, notify, setRole, setCandI
     const wd = workDays(y, m, hols);
     const days = Array.from({ length: dim }, (_, i) => {
       const dt = new Date(y, m - 1, i + 1);
-      const ds = \`\${y}-\${String(m).padStart(2, "0")}-\${String(i + 1).padStart(2, "0")}\`;
+      const ds = `${y}-${String(m).padStart(2, "0")}-${String(i + 1).padStart(2, "0")}`;
       return { date: ds, day: i + 1, dn: DN[dt.getDay()], isWE: dt.getDay() === 0 || dt.getDay() === 6, isHol: holSet.has(ds) };
     });
 
@@ -348,14 +348,14 @@ function CandidatePortal({ D, save, candId, pushAlert, notify, setRole, setCandI
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 6 }}>
           {DN.map((d) => <div key={d} style={{ textAlign: "center", fontSize: 10, color: "#5a6b85", fontWeight: 600, padding: 4 }}>{d}</div>)}
-          {Array.from({ length: new Date(y, m - 1, 1).getDay() }, (_, i) => <div key={\`e\${i}\`} />)}
+          {Array.from({ length: new Date(y, m - 1, 1).getDay() }, (_, i) => <div key={`e${i}`} />)}
           {days.map((d) => {
-            const v = D.attendance[\`\${candId}_\${d.date}\`];
+            const v = D.attendance[`${candId}_${d.date}`];
             const isToday = d.date === todayStr();
             const isOff = d.isWE || d.isHol;
             return (
               <button key={d.day} onClick={() => { if (!d.isWE) { const nx = SCYCLE[(SCYCLE.indexOf(v) + 1) % SCYCLE.length]; markAtt(d.date, nx); } }}
-                style={{ padding: "10px 4px", borderRadius: 10, border: isToday ? "2px solid #6366f1" : \`1px solid \${isOff ? "#1c264040" : "#1c2640"}\`, background: v ? SC[v] + "15" : isOff ? "#0a0e17" : "#0f1520", cursor: d.isWE ? "default" : "pointer", textAlign: "center", fontFamily: "inherit", opacity: isOff && !v ? 0.35 : 1 }}>
+                style={{ padding: "10px 4px", borderRadius: 10, border: isToday ? "2px solid #6366f1" : `1px solid ${isOff ? "#1c264040" : "#1c2640"}`, background: v ? SC[v] + "15" : isOff ? "#0a0e17" : "#0f1520", cursor: d.isWE ? "default" : "pointer", textAlign: "center", fontFamily: "inherit", opacity: isOff && !v ? 0.35 : 1 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: v ? SC[v] : "#e8edf5" }}>{d.day}</div>
                 <div style={{ fontSize: 9, marginTop: 2, fontWeight: 700, color: v ? SC[v] : d.isHol ? "#ec4899" : "#5a6b85" }}>{v ? SL[v] : d.isHol ? "HOL" : ""}</div>
               </button>
@@ -417,10 +417,10 @@ function CandidatePortal({ D, save, candId, pushAlert, notify, setRole, setCandI
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh", fontFamily: "'DM Sans',sans-serif", background: "#080c14", color: "#e8edf5" }}>
-      <style>{\`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');
 @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 button:hover{filter:brightness(1.1);}input:focus,select:focus,textarea:focus{border-color:#6366f1!important;}
-*{scrollbar-width:thin;scrollbar-color:#1c2640 transparent;}\`}</style>
+*{scrollbar-width:thin;scrollbar-color:#1c2640 transparent;}`}</style>
       <div style={{ background: "#0f1520", borderBottom: "1px solid #1c2640", padding: "14px 24px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <div style={{ width: 34, height: 34, borderRadius: 8, background: "#22c55e20", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>👤</div>
@@ -465,7 +465,7 @@ function OwnerPanel({ D, save, pushAlert, notify, setRole, toast }) {
 
   const markAtt = (eid, date, status) => {
     const att = { ...D.attendance };
-    const k = \`\${eid}_\${date}\`;
+    const k = `${eid}_${date}`;
     if (!status) delete att[k]; else att[k] = status;
     save({ ...D, attendance: att });
   };
@@ -477,8 +477,8 @@ function OwnerPanel({ D, save, pushAlert, notify, setRole, toast }) {
     const dim = new Date(y, m, 0).getDate();
     let p = 0, a = 0, l = 0, h = 0, w = 0;
     for (let d = 1; d <= dim; d++) {
-      const ds = \`\${y}-\${String(m).padStart(2, "0")}-\${String(d).padStart(2, "0")}\`;
-      const v = D.attendance[\`\${eid}_\${ds}\`];
+      const ds = `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+      const v = D.attendance[`${eid}_${ds}`];
       if (v === "present") p++; else if (v === "absent") a++; else if (v === "leave") l++; else if (v === "halfday") h++; else if (v === "wfh") w++;
     }
     return { present: p, absent: a, leave: l, halfday: h, wfh: w, effective: p + w + h * 0.5 };
@@ -507,12 +507,12 @@ function OwnerPanel({ D, save, pushAlert, notify, setRole, toast }) {
     const grand = totalNet + hr;
     let nd = pushAlert(D, {
       type: "payment", icon: "💰",
-      title: \`Payment Reminder — 15th \${MN[nm]} \${ny}\`,
-      msg: \`Total: \${fmt(grand)} for \${E.length} people.\n\${PROJECTS.map((p) => \`• \${p}: \${fmt(E.filter((e) => e.project === p).reduce((s, e) => s + calcPay(e, mo).net, 0))}\`).join("\n")}\${hr > 0 ? \`\n• HR: \${fmt(hr)}\` : ""}\`,
+      title: `Payment Reminder — 15th ${MN[nm]} ${ny}`,
+      msg: `Total: ${fmt(grand)} for ${E.length} people.\n${PROJECTS.map((p) => `• ${p}: ${fmt(E.filter((e) => e.project === p).reduce((s, e) => s + calcPay(e, mo).net, 0))}`).join("\n")}${hr > 0 ? `\n• HR: ${fmt(hr)}` : ""}`,
       sev: "high", project: "All", hasEmail: true, hasSMS: true,
-      emailSubject: \`[ProjectHub] PAYMENT DUE 15th \${MN[nm]} \${ny} — \${fmt(grand)}\`,
-      emailBody: \`Hi,\n\nSalary due on 15th \${MN[nm]} \${ny}.\n\nMonth: \${MN[m]} \${y}\n\n\${E.map((e) => { const s = calcPay(e, mo); return \`\${e.name} (\${e.project}): \${fmt(s.net)} [\${s.effective}/\${s.empWD} days]\`; }).join("\n")}\${hr > 0 ? \`\n\nHR Budget: \${fmt(hr)}\` : ""}\n\nGRAND TOTAL: \${fmt(grand)}\n\n— ProjectHub\`,
-      smsBody: \`ProjectHub: Payment due 15th \${MN[nm]}. Total: \${fmt(grand)} for \${E.length} people.\`,
+      emailSubject: `[ProjectHub] PAYMENT DUE 15th ${MN[nm]} ${ny} — ${fmt(grand)}`,
+      emailBody: `Hi,\n\nSalary due on 15th ${MN[nm]} ${ny}.\n\nMonth: ${MN[m]} ${y}\n\n${E.map((e) => { const s = calcPay(e, mo); return `${e.name} (${e.project}): ${fmt(s.net)} [${s.effective}/${s.empWD} days]`; }).join("\n")}${hr > 0 ? `\n\nHR Budget: ${fmt(hr)}` : ""}\n\nGRAND TOTAL: ${fmt(grand)}\n\n— ProjectHub`,
+      smsBody: `ProjectHub: Payment due 15th ${MN[nm]}. Total: ${fmt(grand)} for ${E.length} people.`,
     });
     save(nd);
     notify("Reminder created!");
@@ -533,7 +533,7 @@ function OwnerPanel({ D, save, pushAlert, notify, setRole, toast }) {
 
   // Dashboard
   const rDash = () => {
-    const td = todayStr(); const tp = E.filter((e) => { const s = D.attendance[\`\${e.id}_\${td}\`]; return s === "present" || s === "wfh"; }).length;
+    const td = todayStr(); const tp = E.filter((e) => { const s = D.attendance[`${e.id}_${td}`]; return s === "present" || s === "wfh"; }).length;
     const unread = (D.alerts || []).filter((a) => !a.read).length;
     return (<div>
       <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 22 }}>
@@ -543,7 +543,7 @@ function OwnerPanel({ D, save, pushAlert, notify, setRole, toast }) {
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
         <Cd><h4 style={{ margin: "0 0 12px", color: "#e8edf5", fontSize: 14 }}>Projects</h4>
-          {PROJECTS.map((p) => { const c = E.filter((e) => e.project === p).length; const pct = E.length ? (c / E.length * 100) : 0; return (<div key={p} style={{ marginBottom: 14 }}><div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}><span style={{ fontSize: 12, color: "#8899b4" }}><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: PC[p], marginRight: 6 }} />{p}</span><span style={{ fontSize: 12, color: "#e8edf5", fontWeight: 600 }}>{c}</span></div><div style={{ height: 4, background: "#1c2640", borderRadius: 2 }}><div style={{ height: "100%", width: \`\${pct}%\`, background: PC[p], borderRadius: 2 }} /></div></div>); })}
+          {PROJECTS.map((p) => { const c = E.filter((e) => e.project === p).length; const pct = E.length ? (c / E.length * 100) : 0; return (<div key={p} style={{ marginBottom: 14 }}><div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}><span style={{ fontSize: 12, color: "#8899b4" }}><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: PC[p], marginRight: 6 }} />{p}</span><span style={{ fontSize: 12, color: "#e8edf5", fontWeight: 600 }}>{c}</span></div><div style={{ height: 4, background: "#1c2640", borderRadius: 2 }}><div style={{ height: "100%", width: `${pct}%`, background: PC[p], borderRadius: 2 }} /></div></div>); })}
         </Cd>
         <Cd><h4 style={{ margin: "0 0 12px", color: "#e8edf5", fontSize: 14 }}>Recent Alerts</h4>
           {(D.alerts || []).slice(0, 5).map((a) => (<div key={a.id} style={{ display: "flex", gap: 8, padding: "6px 0", borderBottom: "1px solid #1c2640" }}><span>{a.icon}</span><div style={{ flex: 1 }}><div style={{ fontSize: 11, color: "#e8edf5", fontWeight: 500 }}>{a.title}</div><div style={{ fontSize: 9, color: "#5a6b85" }}>{new Date(a.ts).toLocaleString("en-IN", { dateStyle: "short", timeStyle: "short" })}</div></div>{!a.read && <span style={{ width: 5, height: 5, borderRadius: 3, background: "#6366f1", marginTop: 5 }} />}</div>))}
@@ -586,7 +586,7 @@ function OwnerPanel({ D, save, pushAlert, notify, setRole, toast }) {
           </div>))}
         </div>}
       {modal === "addEmp" && <Mod title="Add Person" onClose={() => setModal(null)}><Form onSave={(e) => { addEmp(e); setModal(null); }} btn="Add" /></Mod>}
-      {modal === "editEmp" && mdata && <Mod title={\`Edit — \${mdata.name}\`} onClose={() => { setModal(null); setMdata(null); }}><Form init={{ ...mdata, salary: String(mdata.salary) }} onSave={(u) => { updEmp(mdata.id, u); setModal(null); setMdata(null); }} btn="Update" /></Mod>}
+      {modal === "editEmp" && mdata && <Mod title={`Edit — ${mdata.name}`} onClose={() => { setModal(null); setMdata(null); }}><Form init={{ ...mdata, salary: String(mdata.salary) }} onSave={(u) => { updEmp(mdata.id, u); setModal(null); setMdata(null); }} btn="Update" /></Mod>}
     </div>);
   };
 
@@ -594,7 +594,7 @@ function OwnerPanel({ D, save, pushAlert, notify, setRole, toast }) {
   const rAtt = () => {
     const [y, m] = mo.split("-").map(Number); const dim = new Date(y, m, 0).getDate(); const wd = workDays(y, m, hols);
     const DN = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]; const holSet = new Set(hols);
-    const dates = Array.from({ length: dim }, (_, i) => { const dt = new Date(y, m - 1, i + 1); const ds = \`\${y}-\${String(m).padStart(2, "0")}-\${String(i + 1).padStart(2, "0")}\`; return { date: ds, day: i + 1, dn: DN[dt.getDay()], isWE: dt.getDay() === 0 || dt.getDay() === 6, isHol: holSet.has(ds) }; });
+    const dates = Array.from({ length: dim }, (_, i) => { const dt = new Date(y, m - 1, i + 1); const ds = `${y}-${String(m).padStart(2, "0")}-${String(i + 1).padStart(2, "0")}`; return { date: ds, day: i + 1, dn: DN[dt.getDay()], isWE: dt.getDay() === 0 || dt.getDay() === 6, isHol: holSet.has(ds) }; });
     return (<div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}><input type="month" value={mo} onChange={(e) => setMo(e.target.value)} style={inputStyle} /><span style={{ fontSize: 11, color: "#5a6b85" }}>{wd} days</span><Bt v="g" s={{ fontSize: 10, padding: "5px 10px" }} onClick={() => setModal("addHol")}>+ Holiday</Bt></div>
@@ -608,7 +608,7 @@ function OwnerPanel({ D, save, pushAlert, notify, setRole, toast }) {
           </tr></thead>
           <tbody>{FE.map((emp, ei) => { const st = getStats(emp.id, mo); return (<tr key={emp.id} style={{ background: ei % 2 === 0 ? "#0f1520" : "#080c14" }}>
             <td style={{ position: "sticky", left: 0, background: ei % 2 === 0 ? "#0f1520" : "#080c14", zIndex: 1, padding: "6px 10px", fontWeight: 500, color: "#e8edf5", fontSize: 11 }}>{emp.name}<div style={{ fontSize: 8, color: "#5a6b85" }}>{emp.project}</div></td>
-            {dates.map((d) => { const v = D.attendance[\`\${emp.id}_\${d.date}\`]; const isOff = d.isWE || d.isHol; return (<td key={d.day} style={{ textAlign: "center", padding: 1, opacity: isOff && !v ? 0.2 : 1 }}><button onClick={() => { if (!d.isWE) markAtt(emp.id, d.date, SCYCLE[(SCYCLE.indexOf(v) + 1) % SCYCLE.length]); }} style={{ width: 22, height: 22, borderRadius: 3, border: d.isHol && !v ? "1px dashed #ec4899" : "none", cursor: d.isWE ? "default" : "pointer", fontSize: 8, fontWeight: 700, background: v ? SC[v] + "20" : "transparent", color: v ? SC[v] : "#5a6b85", padding: 0, lineHeight: "22px" }}>{v ? SL[v] : d.isHol ? "H" : "·"}</button></td>); })}
+            {dates.map((d) => { const v = D.attendance[`${emp.id}_${d.date}`]; const isOff = d.isWE || d.isHol; return (<td key={d.day} style={{ textAlign: "center", padding: 1, opacity: isOff && !v ? 0.2 : 1 }}><button onClick={() => { if (!d.isWE) markAtt(emp.id, d.date, SCYCLE[(SCYCLE.indexOf(v) + 1) % SCYCLE.length]); }} style={{ width: 22, height: 22, borderRadius: 3, border: d.isHol && !v ? "1px dashed #ec4899" : "none", cursor: d.isWE ? "default" : "pointer", fontSize: 8, fontWeight: 700, background: v ? SC[v] + "20" : "transparent", color: v ? SC[v] : "#5a6b85", padding: 0, lineHeight: "22px" }}>{v ? SL[v] : d.isHol ? "H" : "·"}</button></td>); })}
             <td style={{ textAlign: "center", fontWeight: 700, color: "#22c55e", fontSize: 12, position: "sticky", right: 0, background: ei % 2 === 0 ? "#0f1520" : "#080c14" }}>{st.effective}</td>
           </tr>); })}</tbody>
         </table></div>}
@@ -622,7 +622,7 @@ function OwnerPanel({ D, save, pushAlert, notify, setRole, toast }) {
     return (<div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}><PF /></div>
       {!rr.length ? <Cd s={{ textAlign: "center", padding: 40 }}><p style={{ color: "#5a6b85" }}>No reports yet. Team members submit from their portal.</p></Cd> :
-        <div style={{ display: "grid", gap: 10 }}>{[...rr].reverse().map((r) => { const emp = E.find((e) => e.id === r.empId); return (<Cd key={r.id}><div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}><div><div style={{ fontSize: 13, fontWeight: 600, color: "#e8edf5" }}>{emp?.name || "?"}</div><div style={{ fontSize: 10, color: "#5a6b85" }}>{r.date} · Week of {r.weekOf}{r.hours ? \` · \${r.hours}h\` : ""}</div></div><Bg color={PC[r.project]}>{r.project}</Bg></div><div style={{ fontSize: 12, color: "#8899b4", lineHeight: 1.6 }}><div style={{ marginBottom: 4 }}><strong style={{ color: "#e8edf5" }}>Done:</strong> {r.summary}</div>{r.blockers && <div style={{ marginBottom: 4 }}><strong style={{ color: "#ef4444" }}>Blockers:</strong> {r.blockers}</div>}{r.nextWeek && <div><strong style={{ color: "#6366f1" }}>Next:</strong> {r.nextWeek}</div>}</div></Cd>); })}</div>}
+        <div style={{ display: "grid", gap: 10 }}>{[...rr].reverse().map((r) => { const emp = E.find((e) => e.id === r.empId); return (<Cd key={r.id}><div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}><div><div style={{ fontSize: 13, fontWeight: 600, color: "#e8edf5" }}>{emp?.name || "?"}</div><div style={{ fontSize: 10, color: "#5a6b85" }}>{r.date} · Week of {r.weekOf}{r.hours ? ` · ${r.hours}h` : ""}</div></div><Bg color={PC[r.project]}>{r.project}</Bg></div><div style={{ fontSize: 12, color: "#8899b4", lineHeight: 1.6 }}><div style={{ marginBottom: 4 }}><strong style={{ color: "#e8edf5" }}>Done:</strong> {r.summary}</div>{r.blockers && <div style={{ marginBottom: 4 }}><strong style={{ color: "#ef4444" }}>Blockers:</strong> {r.blockers}</div>}{r.nextWeek && <div><strong style={{ color: "#6366f1" }}>Next:</strong> {r.nextWeek}</div>}</div></Cd>); })}</div>}
     </div>);
   };
 
@@ -651,7 +651,7 @@ function OwnerPanel({ D, save, pushAlert, notify, setRole, toast }) {
             <td style={{ padding: "8px" }}><span style={{ color: "#22c55e", fontWeight: 600 }}>{sal.effective}</span><span style={{ color: "#5a6b85" }}>/{sal.empWD}</span></td>
             <td style={{ padding: "8px" }}><div style={{ display: "flex", gap: 3, fontSize: 9 }}>
               {sal.present > 0 && <span style={{ color: SC.present }}>{sal.present}P</span>}{sal.wfh > 0 && <span style={{ color: SC.wfh }}>{sal.wfh}W</span>}{sal.halfday > 0 && <span style={{ color: SC.halfday }}>{sal.halfday}H</span>}{sal.absent > 0 && <span style={{ color: SC.absent }}>{sal.absent}A</span>}{sal.leave > 0 && <span style={{ color: SC.leave }}>{sal.leave}L</span>}
-            </div><div style={{ height: 3, background: "#1c2640", borderRadius: 2, marginTop: 3, width: 55 }}><div style={{ height: "100%", width: \`\${sal.attPct}%\`, background: sal.attPct >= 90 ? "#22c55e" : sal.attPct >= 70 ? "#eab308" : "#ef4444", borderRadius: 2 }} /></div></td>
+            </div><div style={{ height: 3, background: "#1c2640", borderRadius: 2, marginTop: 3, width: 55 }}><div style={{ height: "100%", width: `${sal.attPct}%`, background: sal.attPct >= 90 ? "#22c55e" : sal.attPct >= 70 ? "#eab308" : "#ef4444", borderRadius: 2 }} /></div></td>
             <td style={{ padding: "8px", color: "#8899b4" }}>{fmt(sal.perDay)}</td>
             <td style={{ padding: "8px", color: "#22c55e", fontWeight: 700 }}>{fmt(sal.net)}</td>
             <td style={{ padding: "8px" }}><div style={{ display: "flex", gap: 3 }}>
@@ -683,7 +683,7 @@ function OwnerPanel({ D, save, pushAlert, notify, setRole, toast }) {
         </div>
       </div>
       {!alerts.length ? <Cd s={{ textAlign: "center", padding: 40 }}><p style={{ color: "#5a6b85" }}>Alerts appear when team members mark attendance or submit reports.</p></Cd> :
-        <div style={{ display: "grid", gap: 8 }}>{alerts.map((a) => (<Cd key={a.id} s={{ borderLeft: \`3px solid \${sevC[a.sev] || "#6366f1"}\`, opacity: a.read ? .6 : 1 }}>
+        <div style={{ display: "grid", gap: 8 }}>{alerts.map((a) => (<Cd key={a.id} s={{ borderLeft: `3px solid ${sevC[a.sev] || "#6366f1"}`, opacity: a.read ? .6 : 1 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
             <div style={{ flex: 1 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}><span>{a.icon}</span><span style={{ fontSize: 13, fontWeight: 600, color: "#e8edf5" }}>{a.title}</span>{!a.read && <span style={{ width: 5, height: 5, borderRadius: 3, background: "#6366f1" }} />}</div>
@@ -704,7 +704,7 @@ function OwnerPanel({ D, save, pushAlert, notify, setRole, toast }) {
         </div>
         <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
           <Bt v="g" onClick={() => { setModal(null); setMdata(null); }}>Close</Bt>
-          <Bt onClick={() => { window.open(\`mailto:\${D.config?.email || ""}?subject=\${encodeURIComponent(mdata.emailSubject)}&body=\${encodeURIComponent(mdata.emailBody)}\`, "_blank"); notify("Mail opened!"); }}>📧 Send</Bt>
+          <Bt onClick={() => { window.open(`mailto:${D.config?.email || ""}?subject=${encodeURIComponent(mdata.emailSubject)}&body=${encodeURIComponent(mdata.emailBody)}`, "_blank"); notify("Mail opened!"); }}>📧 Send</Bt>
         </div>
       </Mod>}
       {modal === "smsPrev" && mdata && <Mod title="💬 SMS Preview" onClose={() => { setModal(null); setMdata(null); }}>
@@ -714,7 +714,7 @@ function OwnerPanel({ D, save, pushAlert, notify, setRole, toast }) {
         </div>
         <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
           <Bt v="g" onClick={() => { setModal(null); setMdata(null); }}>Close</Bt>
-          <Bt onClick={() => { window.open(\`sms:\${D.config?.phone || ""}?body=\${encodeURIComponent(mdata.smsBody)}\`, "_blank"); notify("SMS opened!"); }}>💬 Send</Bt>
+          <Bt onClick={() => { window.open(`sms:${D.config?.phone || ""}?body=${encodeURIComponent(mdata.smsBody)}`, "_blank"); notify("SMS opened!"); }}>💬 Send</Bt>
         </div>
       </Mod>}
     </div>);
@@ -726,10 +726,10 @@ function OwnerPanel({ D, save, pushAlert, notify, setRole, toast }) {
 
   return (
     <div style={{ display: "flex", height: "100vh", fontFamily: "'DM Sans',sans-serif", background: "#080c14", color: "#e8edf5", overflow: "hidden" }}>
-      <style>{\`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');
 @keyframes spin{to{transform:rotate(360deg)}}@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 button:hover{filter:brightness(1.1);}input:focus,select:focus,textarea:focus{border-color:#6366f1!important;}
-*{scrollbar-width:thin;scrollbar-color:#1c2640 transparent;}\`}</style>
+*{scrollbar-width:thin;scrollbar-color:#1c2640 transparent;}`}</style>
       <div style={{ width: side ? 210 : 50, background: "#0f1520", borderRight: "1px solid #1c2640", display: "flex", flexDirection: "column", transition: "width .2s", overflow: "hidden", flexShrink: 0 }}>
         <div style={{ padding: "16px 12px", display: "flex", alignItems: "center", gap: 8, borderBottom: "1px solid #1c2640" }}>
           <button onClick={() => setSide(!side)} style={{ background: "none", border: "none", color: "#e8edf5", fontSize: 16, cursor: "pointer", flexShrink: 0, width: 24, textAlign: "center" }}>{side ? "\u27E8" : "\u27E9"}</button>
