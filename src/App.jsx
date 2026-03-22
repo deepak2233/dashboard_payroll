@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { doc, onSnapshot, setDoc } from "firebase/firestore";
-import { db } from "./firebase";
+import { supabase } from "./supabase";
 
 const PROJECTS = ["I-Genie", "Lenovo", "Persistent"];
 const uid = () => Math.random().toString(36).slice(2, 9);
@@ -108,42 +107,68 @@ export default function App() {
   const [toast, setToast] = useState(null);
   const tt = useRef();
 
-  // Sync with Firestore
+  // Sync with Supabase
   useEffect(() => {
-    let unsub = () => { };
-    try {
-      const dRef = doc(db, "data", "projecthub");
-      unsub = onSnapshot(dRef, (snap) => {
-        if (snap.exists()) {
-          const cloudData = snap.data();
-          // Merge/Ensure structure
-          if (cloudData && cloudData.employees) {
-            setD(cloudData);
-            saveToStorage(cloudData); // Fallback sync
+    const channel = supabase
+      .channel('db-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'settings',
+          filter: 'id=eq.projecthub'
+        },
+        (payload) => {
+          if (payload.new && payload.new.data) {
+            setD(payload.new.data);
+            saveToStorage(payload.new.data);
           }
-        } else {
-          // Initialize DB if empty
-          const initial = loadFromStorage();
-          setD(initial);
-          setDoc(dRef, initial);
         }
-      }, (err) => {
-        console.error("Firestore sync error:", err);
-        // Fallback to local
+      )
+      .subscribe();
+
+    async function init() {
+      try {
+        const { data, error } = await supabase
+          .from('settings')
+          .select('data')
+          .eq('id', 'projecthub')
+          .single();
+
+        if (error) {
+          if (error.code === 'PGRST116') { // Not found
+            const initial = loadFromStorage();
+            setD(initial);
+            await supabase.from('settings').upsert({ id: 'projecthub', data: initial });
+          } else {
+            console.error("Supabase fetch error:", error);
+            setD(loadFromStorage());
+          }
+        } else if (data && data.data) {
+          setD(data.data);
+          saveToStorage(data.data);
+        }
+      } catch (e) {
+        console.error("Supabase init error:", e);
         setD(loadFromStorage());
-      });
-    } catch (e) {
-      console.error("Firebase init error:", e);
-      setD(loadFromStorage());
+      }
     }
-    return () => unsub();
+
+    init();
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const save = useCallback(async (nd) => {
     setD(nd);
     saveToStorage(nd); // Local fallback
     try {
-      await setDoc(doc(db, "data", "projecthub"), nd);
+      const { error } = await supabase
+        .from('settings')
+        .upsert({ id: 'projecthub', data: nd });
+      if (error) console.error("Cloud save error:", error);
     } catch (e) {
       console.error("Cloud save failed:", e);
     }
