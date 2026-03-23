@@ -105,6 +105,7 @@ export default function App() {
   const [role, setRole] = useState(null);
   const [candId, setCandId] = useState(null);
   const [toast, setToast] = useState(null);
+  const [dbError, setDbError] = useState(null);
   const tt = useRef();
 
   // Sync with Supabase
@@ -142,10 +143,14 @@ export default function App() {
           .single();
 
         if (error) {
-          if (error.code === 'PGRST116') { // Not found
+          if (error.code === 'PGRST116') { // Not found row
             const initial = loadFromStorage();
             setD(initial);
             await supabase.from('settings').upsert({ id: 'projecthub', data: initial });
+          } else if (error.code === 'PGRST205') { // Table not found
+            console.error("Supabase table missing:", error);
+            setDbError("TABLE_MISSING");
+            setD(loadFromStorage());
           } else {
             console.error("Supabase fetch error:", error);
             setD(loadFromStorage());
@@ -192,6 +197,7 @@ export default function App() {
     alerts: [{ ...alert, id: uid(), ts: new Date().toISOString(), read: false }, ...(d.alerts || [])],
   });
 
+  if (dbError === "TABLE_MISSING") return <SqlSetupGuide />;
   if (!D) return <LoadingScreen />;
   if (!role)
     return <LoginScreen D={D} save={save} setRole={setRole} setCandId={setCandId} notify={notify} />;
@@ -209,27 +215,28 @@ export default function App() {
 /*  LOADING                               */
 /* ════════════════════════════════════════ */
 /* ════════════════════════════════════════ */
-/*  SETUP GUIDE                           */
+/*  SQL SETUP GUIDE                       */
 /* ════════════════════════════════════════ */
-function SetupGuide() {
+function SqlSetupGuide() {
+  const sql = `create table settings (id text primary key, data jsonb);
+alter publication supabase_realtime add table settings;`;
+
   return (
     <div style={{ padding: "40px 20px", display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", background: "#080c14", color: "#e8edf5", fontFamily: "'DM Sans',sans-serif" }}>
       <div style={{ maxWidth: 500, width: "100%", background: "#0f1520", border: "1px solid #1c2640", borderRadius: 16, padding: 32, textAlign: "center" }}>
-        <div style={{ width: 64, height: 64, borderRadius: 16, background: "#6366f120", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px", fontSize: 32 }}>⚙️</div>
-        <h2 style={{ margin: "0 0 12px", fontSize: 24, fontWeight: 700 }}>Database Configuration Required</h2>
-        <p style={{ color: "#8899b4", fontSize: 14, lineHeight: 1.6, marginBottom: 24 }}>The database sync is ready, but your credentials are missing. Add your Supabase URL and Key to <code>src/supabase.js</code> to start using the app.</p>
+        <div style={{ width: 64, height: 64, borderRadius: 16, background: "#6366f120", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px", fontSize: 32 }}>🛠</div>
+        <h2 style={{ margin: "0 0 12px", fontSize: 24, fontWeight: 700 }}>Finish Project Sync</h2>
+        <p style={{ color: "#8899b4", fontSize: 14, lineHeight: 1.6, marginBottom: 24 }}>Credentials are correct ✅, now just run the SQL command to create the data table.</p>
 
         <div style={{ textAlign: "left", background: "#151d2e", borderRadius: 10, padding: 20, marginBottom: 24 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: "#6366f1", marginBottom: 12 }}>Next Steps:</div>
-          <ol style={{ margin: 0, paddingLeft: 20, fontSize: 13, color: "#e8edf5", lineHeight: 1.8 }}>
-            <li>Create a project on <b>Supabase.com</b></li>
-            <li>Run the SQL command to create the <code>settings</code> table (see README)</li>
-            <li>Paste your <b>Project URL</b> and <b>Anon Key</b> in <code>src/supabase.js</code></li>
-            <li>Redeploy your application.</li>
-          </ol>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "#6366f1", marginBottom: 12 }}>Run this in Supabase SQL Editor:</div>
+          <pre style={{ margin: 0, padding: 12, background: "#080c14", borderRadius: 6, fontSize: 11, color: "#34d399", overflowX: "auto", border: "1px solid #1c2640" }}>
+            {sql}
+          </pre>
+          <div style={{ fontSize: 11, color: "#5a6b85", marginTop: 12 }}>1. Go to your Supabase Dashboard → <b>SQL Editor</b><br />2. Paste the code above and click <b>Run</b>.</div>
         </div>
 
-        <button onClick={() => window.location.reload()} style={{ width: "100%", padding: "12px", borderRadius: 8, border: "none", background: "#6366f1", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>I've updated the config, reload</button>
+        <button onClick={() => window.location.reload()} style={{ width: "100%", padding: "12px", borderRadius: 8, border: "none", background: "#6366f1", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>I've run the SQL, continue</button>
       </div>
     </div>
   );
