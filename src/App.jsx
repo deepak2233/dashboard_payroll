@@ -391,18 +391,21 @@ function CandidatePortal({ D, save, candId, pushAlert, notify, setRole, setCandI
   };
 
   const submitReport = (r) => {
-    let nd = { ...D, reports: [...D.reports, { ...r, id: uid(), empId: candId, date: todayStr() }] };
-    nd = pushAlert(nd, {
-      type: "cand_report", icon: "📋",
-      title: `Weekly Report — ${emp.name}`,
-      msg: `${emp.name} (${emp.project}) submitted report for ${r.weekOf}.\n\nSummary: ${(r.summary || "").slice(0, 200)}`,
-      sev: "info", project: emp.project, hasEmail: true, hasSMS: true,
-      emailSubject: `[ProjectHub] Weekly Report: ${emp.name} — ${emp.project} (${r.weekOf})`,
-      emailBody: `Hi,\n\nReport from ${emp.name} (${emp.project}).\n\nWeek: ${r.weekOf}\nHours: ${r.hours || "N/A"}\n\n--- DONE ---\n${r.summary}\n\n--- BLOCKERS ---\n${r.blockers || "None"}\n\n--- NEXT WEEK ---\n${r.nextWeek || "N/A"}\n\nTime: ${fmtTime()}, ${fmtD(todayStr())}\n\n— ProjectHub`,
-      smsBody: `ProjectHub: ${emp.name} (${emp.project}) submitted weekly report for ${r.weekOf}.`,
-    });
+    const today = todayStr();
+    const id = uid();
+    const nd = { ...D, reports: [...(D.reports || []), { ...r, id, empId: candId, date: fmtD(today), ts: new Date().toISOString() }] };
+
+    // Alert for owner
+    const emp = D.employees.find(e => e.id === candId);
+    nd.alerts = [{
+      id: uid(), ts: new Date().toISOString(), type: 'report', icon: '📝',
+      title: `Report: ${emp.name}`,
+      msg: r.attachment ? `Attached: ${r.attachmentName}` : `Summary: ${r.summary.slice(0, 100)}...`,
+      read: false
+    }, ...(nd.alerts || [])];
+
     save(nd);
-    notify("Report submitted — Admin notified!");
+    notify("Report submitted!");
   };
 
   const CandAttendance = () => {
@@ -459,15 +462,25 @@ function CandidatePortal({ D, save, candId, pushAlert, notify, setRole, setCandI
   };
 
   const CandReport = () => {
-    const [f, sF] = useState({ project: emp.project, weekOf: "", summary: "", blockers: "", nextWeek: "", hours: "" });
+    const [f, sF] = useState({ project: emp.project, weekOf: "", summary: "", blockers: "", nextWeek: "", hours: "", attachment: null, attachmentName: "" });
     const [submitted, setSubmitted] = useState(false);
+    const [mode, setMode] = useState("write"); // 'write' or 'upload'
     const myReports = (D.reports || []).filter((r) => r.empId === candId);
+
+    const handleFile = (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      if (file.size > 2 * 1024 * 1024) return notify("File too large (max 2MB)", "error");
+      const reader = new FileReader();
+      reader.onloadend = () => sF({ ...f, attachment: reader.result, attachmentName: file.name });
+      reader.readAsDataURL(file);
+    };
 
     if (submitted) return (
       <div style={{ textAlign: "center", padding: 40 }}>
         <div style={{ fontSize: 48, marginBottom: 12 }}>✅</div>
         <h3 style={{ color: "#22c55e", margin: "0 0 8px" }}>Report Submitted!</h3>
-        <p style={{ color: "#8899b4", fontSize: 13 }}>Admin notified via email & SMS.</p>
+        <p style={{ color: "#8899b4", fontSize: 13 }}>Admin notified via dashboard.</p>
         <button onClick={() => setSubmitted(false)} style={{ marginTop: 16, padding: "10px 24px", borderRadius: 8, border: "1px solid #1c2640", background: "transparent", color: "#8899b4", cursor: "pointer", fontFamily: "inherit" }}>Submit Another</button>
       </div>
     );
@@ -476,16 +489,37 @@ function CandidatePortal({ D, save, candId, pushAlert, notify, setRole, setCandI
       <div>
         <div style={{ background: "#0f1520", border: "1px solid #1c2640", borderRadius: 12, padding: 20, marginBottom: 20 }}>
           <h4 style={{ margin: "0 0 14px", color: "#e8edf5", fontSize: 14 }}>Submit Weekly Report</h4>
+
+          <div style={{ display: "flex", gap: 8, marginBottom: 20, background: "#0a0e17", padding: 4, borderRadius: 8 }}>
+            <button onClick={() => setMode("write")} style={{ flex: 1, padding: "8px", borderRadius: 6, border: "none", background: mode === "write" ? "#1c2640" : "transparent", color: mode === "write" ? "#fff" : "#8899b4", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>✍️ Write Report</button>
+            <button onClick={() => setMode("upload")} style={{ flex: 1, padding: "8px", borderRadius: 6, border: "none", background: mode === "upload" ? "#1c2640" : "transparent", color: mode === "upload" ? "#fff" : "#8899b4", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>📎 Upload Report</button>
+          </div>
+
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 12px" }}>
             <div style={{ marginBottom: 12 }}><label style={lblStyle}>Project</label><select value={f.project} onChange={(e) => sF({ ...f, project: e.target.value })} style={{ ...inputStyle, width: "100%" }}>{PROJECTS.map((p) => <option key={p}>{p}</option>)}</select></div>
             <div style={{ marginBottom: 12 }}><label style={lblStyle}>Week Of *</label><input type="date" value={f.weekOf} onChange={(e) => sF({ ...f, weekOf: e.target.value })} style={{ ...inputStyle, width: "100%" }} /></div>
           </div>
           <div style={{ marginBottom: 12 }}><label style={lblStyle}>Hours Worked</label><input type="number" value={f.hours} onChange={(e) => sF({ ...f, hours: e.target.value })} placeholder="40" style={{ ...inputStyle, width: "100%" }} /></div>
-          <div style={{ marginBottom: 12 }}><label style={lblStyle}>Work Summary *</label><textarea rows={4} value={f.summary} onChange={(e) => sF({ ...f, summary: e.target.value })} placeholder="What you accomplished..." style={{ ...inputStyle, width: "100%", resize: "vertical", fontFamily: "inherit" }} /></div>
-          <div style={{ marginBottom: 12 }}><label style={lblStyle}>Blockers</label><textarea rows={2} value={f.blockers} onChange={(e) => sF({ ...f, blockers: e.target.value })} placeholder="Issues..." style={{ ...inputStyle, width: "100%", resize: "vertical", fontFamily: "inherit" }} /></div>
-          <div style={{ marginBottom: 12 }}><label style={lblStyle}>Next Week</label><textarea rows={2} value={f.nextWeek} onChange={(e) => sF({ ...f, nextWeek: e.target.value })} placeholder="Plans..." style={{ ...inputStyle, width: "100%", resize: "vertical", fontFamily: "inherit" }} /></div>
-          <button onClick={() => { if (f.summary && f.weekOf) { submitReport(f); setSubmitted(true); } }} disabled={!f.summary || !f.weekOf}
-            style={{ width: "100%", padding: "12px", borderRadius: 8, border: "none", background: "#6366f1", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", opacity: f.summary && f.weekOf ? 1 : 0.5 }}>📤 Submit Report</button>
+
+          {mode === "write" ? (
+            <>
+              <div style={{ marginBottom: 12 }}><label style={lblStyle}>Work Summary *</label><textarea rows={4} value={f.summary} onChange={(e) => sF({ ...f, summary: e.target.value })} placeholder="What you accomplished..." style={{ ...inputStyle, width: "100%", resize: "vertical", fontFamily: "inherit" }} /></div>
+              <div style={{ marginBottom: 12 }}><label style={lblStyle}>Blockers</label><textarea rows={2} value={f.blockers} onChange={(e) => sF({ ...f, blockers: e.target.value })} placeholder="Issues..." style={{ ...inputStyle, width: "100%", resize: "vertical", fontFamily: "inherit" }} /></div>
+              <div style={{ marginBottom: 12 }}><label style={lblStyle}>Next Week</label><textarea rows={2} value={f.nextWeek} onChange={(e) => sF({ ...f, nextWeek: e.target.value })} placeholder="Plans..." style={{ ...inputStyle, width: "100%", resize: "vertical", fontFamily: "inherit" }} /></div>
+            </>
+          ) : (
+            <div style={{ marginBottom: 20, padding: 20, border: "2px dashed #1c2640", borderRadius: 12, textAlign: "center" }}>
+              <input type="file" onChange={handleFile} style={{ display: "none" }} id="file-upload" accept="image/*,.pdf,.doc,.docx" />
+              <label htmlFor="file-upload" style={{ cursor: "pointer" }}>
+                <div style={{ fontSize: 32, marginBottom: 8 }}>📁</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#e8edf5" }}>{f.attachmentName || "Click to upload file"}</div>
+                <div style={{ fontSize: 11, color: "#5a6b85", marginTop: 4 }}>PDF, Images or Documents (Max 2MB)</div>
+              </label>
+            </div>
+          )}
+
+          <button onClick={() => { if ((f.summary || f.attachment) && f.weekOf) { submitReport(f); setSubmitted(true); } }} disabled={(!f.summary && !f.attachment) || !f.weekOf}
+            style={{ width: "100%", padding: "12px", borderRadius: 8, border: "none", background: "#6366f1", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", opacity: (f.summary || f.attachment) && f.weekOf ? 1 : 0.5 }}>📤 Submit Report</button>
         </div>
         {myReports.length > 0 && (
           <div>
@@ -715,7 +749,42 @@ function OwnerPanel({ D, save, pushAlert, notify, setRole, toast }) {
     return (<div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}><PF /></div>
       {!rr.length ? <Cd s={{ textAlign: "center", padding: 40 }}><p style={{ color: "#5a6b85" }}>No reports yet. Team members submit from their portal.</p></Cd> :
-        <div style={{ display: "grid", gap: 10 }}>{[...rr].reverse().map((r) => { const emp = E.find((e) => e.id === r.empId); return (<Cd key={r.id}><div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}><div><div style={{ fontSize: 13, fontWeight: 600, color: "#e8edf5" }}>{emp?.name || "?"}</div><div style={{ fontSize: 10, color: "#5a6b85" }}>{r.date} · Week of {r.weekOf}{r.hours ? ` · ${r.hours}h` : ""}</div></div><Bg color={PC[r.project]}>{r.project}</Bg></div><div style={{ fontSize: 12, color: "#8899b4", lineHeight: 1.6 }}><div style={{ marginBottom: 4 }}><strong style={{ color: "#e8edf5" }}>Done:</strong> {r.summary}</div>{r.blockers && <div style={{ marginBottom: 4 }}><strong style={{ color: "#ef4444" }}>Blockers:</strong> {r.blockers}</div>}{r.nextWeek && <div><strong style={{ color: "#6366f1" }}>Next:</strong> {r.nextWeek}</div>}</div></Cd>); })}</div>}
+        <div style={{ display: "grid", gap: 10 }}>{[...rr].reverse().map((r) => {
+          const emp = E.find((e) => e.id === r.empId);
+          return (<Cd key={r.id}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+              <div><div style={{ fontSize: 13, fontWeight: 600, color: "#e8edf5" }}>{emp?.name || "?"}</div><div style={{ fontSize: 10, color: "#5a6b85" }}>{r.date} · Week of {r.weekOf}{r.hours ? ` · ${r.hours}h` : ""}</div></div>
+              <div style={{ display: "flex", gap: 6, alignItems: 'center' }}>
+                {r.attachment && (
+                  <button onClick={() => { setMdata(r); setModal("viewAttach"); }} style={{ background: "#6366f120", border: "1px solid #6366f140", borderRadius: 4, padding: "2px 8px", color: "#6366f1", fontSize: 10, cursor: "pointer", fontWeight: 700 }}>📎 Attachment</button>
+                )}
+                <Bg color={PC[r.project]}>{r.project}</Bg>
+              </div>
+            </div>
+            <div style={{ fontSize: 12, color: "#8899b4", lineHeight: 1.6 }}>
+              {r.summary && <div style={{ marginBottom: 4 }}><strong style={{ color: "#e8edf5" }}>Done:</strong> {r.summary}</div>}
+              {r.blockers && <div style={{ marginBottom: 4 }}><strong style={{ color: "#ef4444" }}>Blockers:</strong> {r.blockers}</div>}
+              {r.nextWeek && <div><strong style={{ color: "#6366f1" }}>Next:</strong> {r.nextWeek}</div>}
+              {!r.summary && r.attachment && <div style={{ color: "#6366f1", fontSize: 11, fontStyle: 'italic' }}>Report submitted via attachment only.</div>}
+            </div>
+          </Cd>);
+        })}</div>}
+
+      {modal === "viewAttach" && mdata && (
+        <Mod title={`📎 Attachment: ${mdata.attachmentName}`} onClose={() => { setModal(null); setMdata(null); }} wide>
+          <div style={{ background: "#080c14", borderRadius: 8, padding: 10, textAlign: 'center', minHeight: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {mdata.attachment?.startsWith("data:image/") ? (
+              <img src={mdata.attachment} style={{ maxWidth: '100%', borderRadius: 4, boxShadow: '0 4px 12px rgba(0,0,0,.5)' }} />
+            ) : (
+              <div style={{ padding: 40 }}>
+                <div style={{ fontSize: 40, marginBottom: 12 }}>📄</div>
+                <div style={{ color: '#e8edf5', fontSize: 14, marginBottom: 16 }}>{mdata.attachmentName}</div>
+                <a href={mdata.attachment} download={mdata.attachmentName} style={{ display: 'inline-block', padding: '10px 20px', background: '#6366f1', color: '#fff', borderRadius: 8, textDecoration: 'none', fontWeight: 600, fontSize: 13 }}>Download File</a>
+              </div>
+            )}
+          </div>
+        </Mod>
+      )}
     </div>);
   };
 
