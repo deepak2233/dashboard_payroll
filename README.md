@@ -1,15 +1,28 @@
+# ProjectHub — Workforce Management Platform
 
-## Deploy to Vercel
+Role-based management for attendance, weekly reports, and payroll across I-Genie, Lenovo, and Persistent.
 
-```bash
-git init && git add . && git commit -m "init"
-git remote add origin https://github.com/YOUR_USER/project-hub.git
-git push -u origin main
+## How It Works
+
+The app works immediately with **localStorage** — no database setup needed. To enable real-time sync across devices, optionally add Supabase:
+
+### Optional: Real-Time Sync (Supabase)
+
+1. Create a project on [Supabase.com](https://supabase.com/)
+2. Run in SQL Editor:
+```sql
+create table settings (id text primary key, data jsonb);
+alter publication supabase_realtime add table settings;
 ```
-Then import on [vercel.com](https://vercel.com) → Deploy.
+3. Add to Vercel Environment Variables:
+   - `VITE_SUPABASE_URL`
+   - `VITE_SUPABASE_ANON_KEY`
+
+## Login
+- **Owner**: PIN `1205`
+- **Team Member**: Select name + 4-char access code (shown in Owner Dashboard)
 
 ## Local Dev
-
 ```bash
 npm install && npm run dev
 ```

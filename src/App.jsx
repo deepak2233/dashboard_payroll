@@ -192,7 +192,6 @@ export default function App() {
     alerts: [{ ...alert, id: uid(), ts: new Date().toISOString(), read: false }, ...(d.alerts || [])],
   });
 
-  if (!isSupabaseConfigured) return <SetupGuide />;
   if (!D) return <LoadingScreen />;
   if (!role)
     return <LoginScreen D={D} save={save} setRole={setRole} setCandId={setCandId} notify={notify} />;
