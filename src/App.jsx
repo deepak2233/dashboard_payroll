@@ -585,7 +585,15 @@ function OwnerPanel({ D, save, pushAlert, notify, setRole, toast }) {
   const hols = (D.holidays || []).map((h) => h.date);
 
   const addEmp = (emp) => { save({ ...D, employees: [...E, { ...emp, id: uid(), joinDate: emp.joinDate || todayStr(), code: uid().slice(0, 4) }] }); notify(emp.name + " added"); };
-  const delEmp = (id) => { const n = E.find((e) => e.id === id)?.name; save({ ...D, employees: E.filter((e) => e.id !== id) }); notify(n + " removed"); };
+  const delEmp = (id) => {
+    if (!window.confirm("Permanently delete this person and ALL their data (attendance/reports)?")) return;
+    const n = E.find((e) => e.id === id)?.name;
+    const att = { ...D.attendance };
+    Object.keys(att).forEach(k => { if (k.startsWith(id + "_")) delete att[k]; });
+    const rr = (D.reports || []).filter(r => r.empId !== id);
+    save({ ...D, employees: E.filter((e) => e.id !== id), attendance: att, reports: rr });
+    notify(n + " permanently removed");
+  };
   const updEmp = (id, u) => { save({ ...D, employees: E.map((e) => (e.id === id ? { ...e, ...u } : e)) }); notify("Updated"); };
 
   const markAtt = (eid, date, status) => {
@@ -722,7 +730,12 @@ function OwnerPanel({ D, save, pushAlert, notify, setRole, toast }) {
     const dates = Array.from({ length: dim }, (_, i) => { const dt = new Date(y, m - 1, i + 1); const ds = `${y}-${String(m).padStart(2, "0")}-${String(i + 1).padStart(2, "0")}`; return { date: ds, day: i + 1, dn: DN[dt.getDay()], isWE: dt.getDay() === 0 || dt.getDay() === 6, isHol: holSet.has(ds) }; });
     return (<div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}><input type="month" value={mo} onChange={(e) => setMo(e.target.value)} style={inputStyle} /><span style={{ fontSize: 11, color: "#5a6b85" }}>{wd} days</span><Bt v="g" s={{ fontSize: 10, padding: "5px 10px" }} onClick={() => setModal("addHol")}>+ Holiday</Bt></div>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <input type="month" value={mo} onChange={(e) => setMo(e.target.value)} style={inputStyle} />
+          <span style={{ fontSize: 11, color: "#5a6b85" }}>{wd} days</span>
+          <Bt v="g" s={{ fontSize: 10, padding: "5px 10px" }} onClick={() => setModal("addHol")}>+ Holiday</Bt>
+          <button onClick={() => { if (window.confirm("Clear ALL attendance data for everyone?")) { save({ ...D, attendance: {} }); notify("Attendance cleared"); } }} style={{ background: "transparent", border: "1px solid #ef444440", color: "#ef4444", borderRadius: 6, padding: "5px 10px", fontSize: 10, cursor: "pointer", fontWeight: 600 }}>🗑 Clear All</button>
+        </div>
         <div style={{ display: "flex", gap: 8, fontSize: 10 }}>{Object.entries(SC).map(([k, c]) => <span key={k} style={{ display: "flex", alignItems: "center", gap: 3 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: c }} />{k}</span>)}</div>
       </div>
       {!FE.length ? <Cd s={{ textAlign: "center", padding: 30 }}><p style={{ color: "#5a6b85" }}>Add people first.</p></Cd> :
@@ -747,7 +760,12 @@ function OwnerPanel({ D, save, pushAlert, notify, setRole, toast }) {
   const rRpt = () => {
     const rr = proj === "All" ? D.reports : D.reports.filter((r) => r.project === proj);
     return (<div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}><PF /></div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+        <PF />
+        {rr.length > 0 && (
+          <button onClick={() => { if (window.confirm("Delete ALL reports in this project/view?")) { const keep = (D.reports || []).filter(r => (proj !== "All" && r.project !== proj)); save({ ...D, reports: keep }); notify("Reports cleared"); } }} style={{ background: "transparent", border: "1px solid #ef444440", color: "#ef4444", borderRadius: 6, padding: "6px 12px", fontSize: 11, cursor: "pointer", fontWeight: 600 }}>🗑 Clear All Reports</button>
+        )}
+      </div>
       {!rr.length ? <Cd s={{ textAlign: "center", padding: 40 }}><p style={{ color: "#5a6b85" }}>No reports yet. Team members submit from their portal.</p></Cd> :
         <div style={{ display: "grid", gap: 10 }}>{[...rr].reverse().map((r) => {
           const emp = E.find((e) => e.id === r.empId);
