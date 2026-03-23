@@ -605,6 +605,27 @@ function OwnerPanel({ D, save, pushAlert, notify, setRole, toast }) {
 
   const addHoliday = (date, label) => { save({ ...D, holidays: [...(D.holidays || []), { date, label, id: uid() }] }); notify("Holiday added"); };
 
+  const downloadReport = () => {
+    const [y, m] = mo.split("-").map(Number);
+    const wd = workDays(y, m, hols);
+    const headers = ["Name", "Role", "Project", "Gross Salary", "Working Days (Total)", "Working Days (Emp)", "Present", "WFH", "Half Day", "Absent", "Leave", "Effective Days", "Net Salary", "Att %"];
+    const rows = E.map(e => {
+      const s = calcPay(e, mo);
+      return [
+        e.name, e.role || "Team Member", e.project, e.salary, wd, s.empWD,
+        s.present, s.wfh, s.halfday, s.absent, s.leave, s.effective, s.net, s.attPct + "%"
+      ];
+    });
+    const csv = [headers, ...rows].map(r => r.join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Payroll_Report_${mo}.csv`;
+    a.click();
+    notify("Report downloaded");
+  };
+
   const getStats = (eid, mk) => {
     const [y, m] = mk.split("-").map(Number);
     const dim = new Date(y, m, 0).getDate();
@@ -813,7 +834,11 @@ function OwnerPanel({ D, save, pushAlert, notify, setRole, toast }) {
     return (<div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
         <input type="month" value={mo} onChange={(e) => setMo(e.target.value)} style={inputStyle} />
-        <div style={{ display: "flex", gap: 6 }}><Bt v="g" s={{ fontSize: 11 }} onClick={() => setModal("payConf")}>⚙ Config</Bt><Bt v="ok" s={{ fontSize: 11 }} onClick={triggerPayReminder}>🔔 15th Reminder</Bt></div>
+        <div style={{ display: "flex", gap: 6 }}>
+          <button onClick={downloadReport} style={{ background: "#6366f120", border: "1px solid #6366f140", color: "#6366f1", borderRadius: 8, padding: "8px 16px", fontSize: 12, cursor: "pointer", fontWeight: 600, fontFamily: "inherit", display: "flex", alignItems: "center", gap: 6 }}>📊 Download CSV</button>
+          <Bt v="g" s={{ fontSize: 11 }} onClick={() => setModal("payConf")}>⚙ Config</Bt>
+          <Bt v="ok" s={{ fontSize: 11 }} onClick={triggerPayReminder}>🔔 15th Reminder</Bt>
+        </div>
       </div>
       <div style={{ background: "linear-gradient(135deg,#1e1b4b,#0f1520 70%)", borderRadius: 12, padding: 18, marginBottom: 16, border: "1px solid #1c2640", display: "flex", justifyContent: "space-around", textAlign: "center", flexWrap: "wrap", gap: 12 }}>
         {[["Working Days", wd, "#6366f1"], ["Earned", fmt(totalNet), "#22c55e"], hr > 0 && ["HR", fmt(hr), "#ec4899"], ["Total", fmt(grand), "#eab308"]].filter(Boolean).map(([l, v, c], i) => (<div key={i}><div style={{ fontSize: 9, color: "#5a6b85", textTransform: "uppercase", letterSpacing: 1 }}>{l}</div><div style={{ fontSize: 22, fontWeight: 700, color: c, marginTop: 3 }}>{v}</div></div>))}
