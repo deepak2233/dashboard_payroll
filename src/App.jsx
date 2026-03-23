@@ -9,6 +9,12 @@ const todayStr = () => {
 };
 const monthKey = (d = new Date()) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+const getWeekStart = (d = new Date()) => {
+  const dt = new Date(d);
+  const day = dt.getDay() || 7;
+  if (day !== 1) dt.setHours(-24 * (day - 1));
+  return dt.toISOString().split('T')[0];
+};
 const fmt = (a) => "\u20B9" + Number(a || 0).toLocaleString("en-IN");
 const fmtD = (s) => {
   try {
@@ -462,7 +468,7 @@ function CandidatePortal({ D, save, candId, pushAlert, notify, setRole, setCandI
   };
 
   const CandReport = () => {
-    const [f, sF] = useState({ project: emp.project, weekOf: "", summary: "", blockers: "", nextWeek: "", hours: "", attachment: null, attachmentName: "" });
+    const [f, sF] = useState({ project: emp.project, weekOf: getWeekStart(), summary: "", blockers: "", nextWeek: "", hours: "", attachment: null, attachmentName: "" });
     const [submitted, setSubmitted] = useState(false);
     const [mode, setMode] = useState("write"); // 'write' or 'upload'
     const myReports = (D.reports || []).filter((r) => r.empId === candId);
@@ -755,6 +761,7 @@ function OwnerPanel({ D, save, pushAlert, notify, setRole, toast }) {
           <input type="month" value={mo} onChange={(e) => setMo(e.target.value)} style={inputStyle} />
           <span style={{ fontSize: 11, color: "#5a6b85" }}>{wd} days</span>
           <Bt v="g" s={{ fontSize: 10, padding: "5px 10px" }} onClick={() => setModal("addHol")}>+ Holiday</Bt>
+          <button onClick={downloadReport} style={{ background: "#6366f120", border: "1px solid #6366f140", color: "#6366f1", borderRadius: 6, padding: "5px 10px", fontSize: 10, cursor: "pointer", fontWeight: 700, display: "flex", alignItems: "center", gap: 4 }}>📊 Download CSV</button>
           <button onClick={() => { if (window.confirm("Clear ALL attendance data for everyone?")) { save({ ...D, attendance: {} }); notify("Attendance cleared"); } }} style={{ background: "transparent", border: "1px solid #ef444440", color: "#ef4444", borderRadius: 6, padding: "5px 10px", fontSize: 10, cursor: "pointer", fontWeight: 600 }}>🗑 Clear All</button>
         </div>
         <div style={{ display: "flex", gap: 8, fontSize: 10 }}>{Object.entries(SC).map(([k, c]) => <span key={k} style={{ display: "flex", alignItems: "center", gap: 3 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: c }} />{k}</span>)}</div>
@@ -780,13 +787,46 @@ function OwnerPanel({ D, save, pushAlert, notify, setRole, toast }) {
   // Reports
   const rRpt = () => {
     const rr = proj === "All" ? D.reports : D.reports.filter((r) => r.project === proj);
+    const currWeek = getWeekStart();
+    const missing = E.filter(e => !D.reports?.some(r => r.empId === e.id && r.weekOf === currWeek));
+
+    const sendReminders = () => {
+      let nd = { ...D };
+      missing.forEach(e => {
+        nd = pushAlert(nd, {
+          type: "report_missing", icon: "🔔",
+          title: `Report Missing — Week of ${fmtD(currWeek)}`,
+          msg: `Hey ${e.name}, please file your weekly report soon!`,
+          sev: "high", project: e.project, hasEmail: true,
+          emailSubject: `[ACTION REQUIRED] Weekly Report Missing — ${fmtD(currWeek)}`,
+          emailBody: `Hi ${e.name},\n\nOur records show you haven't submitted your weekly report for the week of ${fmtD(currWeek)}.\n\nPlease log in to ProjectHub and file it as soon as possible.\n\n— ProjectHub Admin`,
+        });
+      });
+      save(nd);
+      notify(`${missing.length} reminders sent!`);
+    };
+
     return (<div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <PF />
-        {rr.length > 0 && (
-          <button onClick={() => { if (window.confirm("Delete ALL reports in this project/view?")) { const keep = (D.reports || []).filter(r => (proj !== "All" && r.project !== proj)); save({ ...D, reports: keep }); notify("Reports cleared"); } }} style={{ background: "transparent", border: "1px solid #ef444440", color: "#ef4444", borderRadius: 6, padding: "6px 12px", fontSize: 11, cursor: "pointer", fontWeight: 600 }}>🗑 Clear All Reports</button>
-        )}
+        <div style={{ display: "flex", gap: 8 }}>
+          {missing.length > 0 && (
+            <button onClick={sendReminders} style={{ background: "#eab30820", border: "1px solid #eab30840", color: "#eab308", borderRadius: 6, padding: "6px 14px", fontSize: 11, cursor: "pointer", fontWeight: 700 }}>🔔 Remind Missing ({missing.length})</button>
+          )}
+          {rr.length > 0 && (
+            <button onClick={() => { if (window.confirm("Delete ALL reports in this project/view?")) { const keep = (D.reports || []).filter(r => (proj !== "All" && r.project !== proj)); save({ ...D, reports: keep }); notify("Reports cleared"); } }} style={{ background: "transparent", border: "1px solid #ef444440", color: "#ef4444", borderRadius: 6, padding: "6px 12px", fontSize: 11, cursor: "pointer", fontWeight: 600 }}>🗑 Clear All Reports</button>
+          )}
+        </div>
       </div>
+      {missing.length > 0 && (
+        <div style={{ background: "#eab30810", border: "1px solid #eab30825", borderRadius: 10, padding: "12px 16px", marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#eab308" }}>Pending Reports</div>
+            <div style={{ fontSize: 11, color: "#8899b4", marginTop: 2 }}>{missing.map(e => e.name).join(", ")}</div>
+          </div>
+          <div style={{ fontSize: 11, color: "#5a6b85", fontStyle: 'italic' }}>Week of {fmtD(currWeek)}</div>
+        </div>
+      )}
       {!rr.length ? <Cd s={{ textAlign: "center", padding: 40 }}><p style={{ color: "#5a6b85" }}>No reports yet. Team members submit from their portal.</p></Cd> :
         <div style={{ display: "grid", gap: 10 }}>{[...rr].reverse().map((r) => {
           const emp = E.find((e) => e.id === r.empId);
