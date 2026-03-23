@@ -325,7 +325,7 @@ button:hover{filter:brightness(1.12);}`}</style>
                 <label style={lblStyle}>Select Your Name</label>
                 <select value={selEmp} onChange={(e) => setSelEmp(e.target.value)} style={{ ...inputStyle, width: "100%", marginBottom: 14 }}>
                   <option value="">— Choose —</option>
-                  {E.map((e) => <option key={e.id} value={e.id}>{e.name} ({e.project})</option>)}
+                  {E.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
                 </select>
                 <label style={lblStyle}>Access Code</label>
                 <input value={empCode} onChange={(e) => setEmpCode(e.target.value)} onKeyDown={(e) => e.key === "Enter" && candLogin()} placeholder="Your access code" style={{ ...inputStyle, width: "100%", textAlign: "center" }} />
