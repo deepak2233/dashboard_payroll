@@ -755,6 +755,27 @@ function OwnerPanel({ D, save, pushAlert, notify, setRole, toast }) {
     const [y, m] = mo.split("-").map(Number); const dim = new Date(y, m, 0).getDate(); const wd = workDays(y, m, hols);
     const DN = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]; const holSet = new Set(hols);
     const dates = Array.from({ length: dim }, (_, i) => { const dt = new Date(y, m - 1, i + 1); const ds = `${y}-${String(m).padStart(2, "0")}-${String(i + 1).padStart(2, "0")}`; return { date: ds, day: i + 1, dn: DN[dt.getDay()], isWE: dt.getDay() === 0 || dt.getDay() === 6, isHol: holSet.has(ds) }; });
+
+    const today = todayStr();
+    const isTodayInView = mo === monthKey();
+    const missingAtt = isTodayInView ? E.filter(e => !D.attendance[`${e.id}_${today}`]) : [];
+
+    const sendAttReminders = () => {
+      let nd = { ...D };
+      missingAtt.forEach(e => {
+        nd = pushAlert(nd, {
+          type: "att_missing", icon: "⏰",
+          title: `Attendance Missing — ${fmtD(today)}`,
+          msg: `Hey ${e.name}, you haven't marked your attendance for today yet!`,
+          sev: "high", project: e.project, hasEmail: true,
+          emailSubject: `[ACTION REQUIRED] Attendance Missing — ${fmtD(today)}`,
+          emailBody: `Hi ${e.name},\n\nOur records show you haven't marked your attendance for today (${fmtD(today)}).\n\nPlease log in to ProjectHub and mark your status (Present, WFH, etc.) as soon as possible.\n\n— ProjectHub Admin`,
+        });
+      });
+      save(nd);
+      notify(`${missingAtt.length} attendance reminders sent!`);
+    };
+
     return (<div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -762,10 +783,25 @@ function OwnerPanel({ D, save, pushAlert, notify, setRole, toast }) {
           <span style={{ fontSize: 11, color: "#5a6b85" }}>{wd} days</span>
           <Bt v="g" s={{ fontSize: 10, padding: "5px 10px" }} onClick={() => setModal("addHol")}>+ Holiday</Bt>
           <button onClick={downloadReport} style={{ background: "#6366f120", border: "1px solid #6366f140", color: "#6366f1", borderRadius: 6, padding: "5px 10px", fontSize: 10, cursor: "pointer", fontWeight: 700, display: "flex", alignItems: "center", gap: 4 }}>📊 Download CSV</button>
+
+          {missingAtt.length > 0 && (
+            <button onClick={sendAttReminders} style={{ background: "#f59e0b20", border: "1px solid #f59e0b40", color: "#f59e0b", borderRadius: 6, padding: "5px 10px", fontSize: 10, cursor: "pointer", fontWeight: 700 }}>🔔 Remind Missing ({missingAtt.length})</button>
+          )}
+
           <button onClick={() => { if (window.confirm("Clear ALL attendance data for everyone?")) { save({ ...D, attendance: {} }); notify("Attendance cleared"); } }} style={{ background: "transparent", border: "1px solid #ef444440", color: "#ef4444", borderRadius: 6, padding: "5px 10px", fontSize: 10, cursor: "pointer", fontWeight: 600 }}>🗑 Clear All</button>
         </div>
         <div style={{ display: "flex", gap: 8, fontSize: 10 }}>{Object.entries(SC).map(([k, c]) => <span key={k} style={{ display: "flex", alignItems: "center", gap: 3 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: c }} />{k}</span>)}</div>
       </div>
+
+      {missingAtt.length > 0 && (
+        <div style={{ background: "#f59e0b10", border: "1px solid #f59e0b25", borderRadius: 12, padding: "12px 18px", marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#f59e0b" }}>Attendance Pending for Today</div>
+            <div style={{ fontSize: 11, color: "#8899b4", marginTop: 2 }}>Not marked: {missingAtt.map(e => e.name).join(", ")}</div>
+          </div>
+          <div style={{ fontSize: 11, color: "#5a6b85", fontWeight: 600 }}>{fmtD(today)}</div>
+        </div>
+      )}
       {!FE.length ? <Cd s={{ textAlign: "center", padding: 30 }}><p style={{ color: "#5a6b85" }}>Add people first.</p></Cd> :
         <div style={{ overflowX: "auto", borderRadius: 10, border: "1px solid #1c2640" }}><table style={{ width: "100%", borderCollapse: "collapse", fontSize: 10 }}>
           <thead><tr style={{ background: "#151d2e" }}><th style={{ position: "sticky", left: 0, background: "#151d2e", zIndex: 2, padding: "6px 10px", textAlign: "left", color: "#5a6b85", minWidth: 110, fontSize: 9 }}>Name</th>
