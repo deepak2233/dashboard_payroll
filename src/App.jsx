@@ -515,11 +515,11 @@ function CandidatePortal({ D, save, candId, pushAlert, notify, setRole, setCandI
             </>
           ) : (
             <div style={{ marginBottom: 20, padding: 20, border: "2px dashed #1c2640", borderRadius: 12, textAlign: "center" }}>
-              <input type="file" onChange={handleFile} style={{ display: "none" }} id="file-upload" accept="image/*,.pdf,.doc,.docx" />
+              <input type="file" onChange={handleFile} style={{ display: "none" }} id="file-upload" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" />
               <label htmlFor="file-upload" style={{ cursor: "pointer" }}>
-                <div style={{ fontSize: 32, marginBottom: 8 }}>📁</div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#e8edf5" }}>{f.attachmentName || "Click to upload file"}</div>
-                <div style={{ fontSize: 11, color: "#5a6b85", marginTop: 4 }}>PDF, Images or Documents (Max 2MB)</div>
+                <div style={{ fontSize: 32, marginBottom: 8 }}>📊</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#e8edf5" }}>{f.attachmentName || "Select File / Excel"}</div>
+                <div style={{ fontSize: 11, color: "#5a6b85", marginTop: 4 }}>Excel, PDF, Images or Docs (Max 2MB)</div>
               </label>
             </div>
           )}
