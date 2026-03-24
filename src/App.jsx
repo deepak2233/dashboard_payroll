@@ -760,20 +760,28 @@ function OwnerPanel({ D, save, pushAlert, notify, setRole, toast }) {
     const isTodayInView = mo === monthKey();
     const missingAtt = isTodayInView ? E.filter(e => !D.attendance[`${e.id}_${today}`]) : [];
 
-    const sendAttReminders = () => {
+    const sendAttReminders = (type = "dashboard") => {
       let nd = { ...D };
+      const subject = `[ACTION REQUIRED] Attendance Missing — ${fmtD(today)}`;
+      const body = `Hi,\n\nOur records show you haven't marked your attendance for today (${fmtD(today)}).\n\nPlease log in to ProjectHub and mark your status (Present, WFH, etc.) as soon as possible.\n\n— ProjectHub Admin`;
+
+      if (type === "email") {
+        const bcc = missingAtt.map(e => e.email).filter(Boolean).join(",");
+        if (bcc) window.open(`mailto:?bcc=${bcc}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`);
+        else notify("No email addresses found for missing members", "error");
+      }
+
       missingAtt.forEach(e => {
         nd = pushAlert(nd, {
           type: "att_missing", icon: "⏰",
           title: `Attendance Missing — ${fmtD(today)}`,
           msg: `Hey ${e.name}, you haven't marked your attendance for today yet!`,
           sev: "high", project: e.project, hasEmail: true,
-          emailSubject: `[ACTION REQUIRED] Attendance Missing — ${fmtD(today)}`,
-          emailBody: `Hi ${e.name},\n\nOur records show you haven't marked your attendance for today (${fmtD(today)}).\n\nPlease log in to ProjectHub and mark your status (Present, WFH, etc.) as soon as possible.\n\n— ProjectHub Admin`,
+          emailSubject: subject, emailBody: body,
         });
       });
       save(nd);
-      notify(`${missingAtt.length} attendance reminders sent!`);
+      notify(`${missingAtt.length} attendance alerts created!`);
     };
 
     return (<div>
@@ -785,7 +793,10 @@ function OwnerPanel({ D, save, pushAlert, notify, setRole, toast }) {
           <button onClick={downloadReport} style={{ background: "#6366f120", border: "1px solid #6366f140", color: "#6366f1", borderRadius: 6, padding: "5px 10px", fontSize: 10, cursor: "pointer", fontWeight: 700, display: "flex", alignItems: "center", gap: 4 }}>📊 Download CSV</button>
 
           {missingAtt.length > 0 && (
-            <button onClick={sendAttReminders} style={{ background: "#f59e0b20", border: "1px solid #f59e0b40", color: "#f59e0b", borderRadius: 6, padding: "5px 10px", fontSize: 10, cursor: "pointer", fontWeight: 700 }}>🔔 Remind Missing ({missingAtt.length})</button>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button onClick={() => sendAttReminders("dashboard")} style={{ background: "#f59e0b20", border: "1px solid #f59e0b40", color: "#f59e0b", borderRadius: 6, padding: "5px 10px", fontSize: 10, cursor: "pointer", fontWeight: 700 }}>🔔 Alert ({missingAtt.length})</button>
+              <button onClick={() => sendAttReminders("email")} style={{ background: "#6366f120", border: "1px solid #6366f140", color: "#6366f1", borderRadius: 6, padding: "5px 10px", fontSize: 10, cursor: "pointer", fontWeight: 700 }}>✉️ Email</button>
+            </div>
           )}
 
           <button onClick={() => { if (window.confirm("Clear ALL attendance data for everyone?")) { save({ ...D, attendance: {} }); notify("Attendance cleared"); } }} style={{ background: "transparent", border: "1px solid #ef444440", color: "#ef4444", borderRadius: 6, padding: "5px 10px", fontSize: 10, cursor: "pointer", fontWeight: 600 }}>🗑 Clear All</button>
@@ -826,20 +837,28 @@ function OwnerPanel({ D, save, pushAlert, notify, setRole, toast }) {
     const currWeek = getWeekStart();
     const missing = E.filter(e => !D.reports?.some(r => r.empId === e.id && r.weekOf === currWeek));
 
-    const sendReminders = () => {
+    const sendReminders = (type = "dashboard") => {
       let nd = { ...D };
+      const subject = `[ACTION REQUIRED] Weekly Report Missing — ${fmtD(currWeek)}`;
+      const body = `Hi,\n\nOur records show you haven't submitted your weekly report for the week of ${fmtD(currWeek)}.\n\nPlease log in to ProjectHub and file it as soon as possible.\n\n— ProjectHub Admin`;
+
+      if (type === "email") {
+        const bcc = missing.map(e => e.email).filter(Boolean).join(",");
+        if (bcc) window.open(`mailto:?bcc=${bcc}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`);
+        else notify("No email addresses found for missing members", "error");
+      }
+
       missing.forEach(e => {
         nd = pushAlert(nd, {
           type: "report_missing", icon: "🔔",
           title: `Report Missing — Week of ${fmtD(currWeek)}`,
           msg: `Hey ${e.name}, please file your weekly report soon!`,
           sev: "high", project: e.project, hasEmail: true,
-          emailSubject: `[ACTION REQUIRED] Weekly Report Missing — ${fmtD(currWeek)}`,
-          emailBody: `Hi ${e.name},\n\nOur records show you haven't submitted your weekly report for the week of ${fmtD(currWeek)}.\n\nPlease log in to ProjectHub and file it as soon as possible.\n\n— ProjectHub Admin`,
+          emailSubject: subject, emailBody: body,
         });
       });
       save(nd);
-      notify(`${missing.length} reminders sent!`);
+      notify(`${missing.length} report alerts created!`);
     };
 
     return (<div>
@@ -847,7 +866,10 @@ function OwnerPanel({ D, save, pushAlert, notify, setRole, toast }) {
         <PF />
         <div style={{ display: "flex", gap: 8 }}>
           {missing.length > 0 && (
-            <button onClick={sendReminders} style={{ background: "#eab30820", border: "1px solid #eab30840", color: "#eab308", borderRadius: 6, padding: "6px 14px", fontSize: 11, cursor: "pointer", fontWeight: 700 }}>🔔 Remind Missing ({missing.length})</button>
+            <div style={{ display: "flex", gap: 6 }}>
+              <button onClick={() => sendReminders("dashboard")} style={{ background: "#eab30820", border: "1px solid #eab30840", color: "#eab308", borderRadius: 6, padding: "6px 14px", fontSize: 11, cursor: "pointer", fontWeight: 700 }}>🔔 Alert ({missing.length})</button>
+              <button onClick={() => sendReminders("email")} style={{ background: "#6366f120", border: "1px solid #6366f140", color: "#6366f1", borderRadius: 6, padding: "6px 14px", fontSize: 11, cursor: "pointer", fontWeight: 700 }}>✉️ Email</button>
+            </div>
           )}
           {rr.length > 0 && (
             <button onClick={() => { if (window.confirm("Delete ALL reports in this project/view?")) { const keep = (D.reports || []).filter(r => (proj !== "All" && r.project !== proj)); save({ ...D, reports: keep }); notify("Reports cleared"); } }} style={{ background: "transparent", border: "1px solid #ef444440", color: "#ef4444", borderRadius: 6, padding: "6px 12px", fontSize: 11, cursor: "pointer", fontWeight: 600 }}>🗑 Clear All Reports</button>
