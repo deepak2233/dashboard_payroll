@@ -18,9 +18,7 @@ alter publication supabase_realtime add table settings;
    - `VITE_SUPABASE_URL`
    - `VITE_SUPABASE_ANON_KEY`
 
-## Login
-- **Owner**: PIN `1205`
-- **Team Member**: Select name + 4-char access code (shown in Owner Dashboard)
+: Select name + 4-char access code (shown in Owner Dashboard)
 
 ## Local Dev
 ```bash
