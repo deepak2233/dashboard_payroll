@@ -486,6 +486,13 @@ const CandAttendance = () => {
     notify(r.id ? "Report updated!" : "Report submitted!");
   };
 
+  const delReport = (id) => {
+    if (!window.confirm("Delete this report?")) return;
+    const nd = { ...D, reports: D.reports.filter(r => r.id !== id) };
+    save(nd);
+    notify("Report deleted");
+  };
+
   const CandAttendance = () => {
     const [y, m] = mo.split("-").map(Number);
     const dim = new Date(y, m, 0).getDate();
@@ -613,13 +620,30 @@ const CandAttendance = () => {
                     <div style={{ fontSize: 11, color: "#e8edf5", fontWeight: 600 }}>Week of {r.weekOf}</div>
                     <div style={{ fontSize: 9, color: (r.status === "approved" ? "#22c55e" : r.status === "review" ? "#eab308" : "#8899b4"), fontWeight: 700, textTransform: "uppercase", background: (r.status === "approved" ? "#22c55e15" : r.status === "review" ? "#eab30815" : "#1c2640"), padding: "2px 6px", borderRadius: 4 }}>{r.status || "pending"}</div>
                   </div>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                     <span style={{ fontSize: 10, color: "#5a6b85" }}>{r.date}</span>
-                     {r.status !== "approved" && (
-                       <button onClick={() => { setEditId(r.id); sF({ ...r }); setMode(r.attachment ? "upload" : "write"); window.scrollTo({ top: 0, behavior: 'smooth' }); }} style={{ background: "transparent", border: "none", color: "#6366f1", fontSize: 11, cursor: "pointer", fontWeight: 600 }}>✏️ Edit</button>
-                     )}
+                  
+                  <div style={{ fontSize: 12, color: "#8899b4", marginBottom: 8, lineHeight: 1.4 }}>
+                    {r.hours && <div style={{ marginBottom: 4 }}><strong>Hours:</strong> {r.hours}</div>}
+                    {r.summary && <div><strong>Summary:</strong> {r.summary}</div>}
+                    {r.blockers && <div style={{ marginTop: 4 }}><strong>Blockers:</strong> {r.blockers}</div>}
+                    {r.nextWeek && <div style={{ marginTop: 4 }}><strong>Next Week:</strong> {r.nextWeek}</div>}
+                    {r.attachment && (
+                      <div style={{ marginTop: 8 }}>
+                        <a href={r.attachment} download={r.attachmentName || "report"} style={{ color: "#6366f1", fontSize: 11, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 4, background: "#6366f110", padding: "4px 8px", borderRadius: 4 }}>📎 {r.attachmentName || "View Attachment"}</a>
+                      </div>
+                    )}
                   </div>
-                  <p style={{ margin: "8px 0 0", fontSize: 12, color: "#8899b4", lineHeight: 1.5 }}>{r.summary?.slice(0, 200)}{r.summary?.length > 200 ? "..." : ""}</p>
+
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid #1c264030", paddingTop: 8, marginTop: 8 }}>
+                     <span style={{ fontSize: 10, color: "#5a6b85" }}>Submitted: {r.date}</span>
+                     <div style={{ display: "flex", gap: 12 }}>
+                       {r.status !== "approved" && (
+                         <>
+                           <button onClick={() => { setEditId(r.id); sF({ ...r }); setMode(r.attachment ? "upload" : "write"); window.scrollTo({ top: 0, behavior: 'smooth' }); }} style={{ background: "transparent", border: "none", color: "#6366f1", fontSize: 11, cursor: "pointer", fontWeight: 600 }}>✏️ Edit</button>
+                           <button onClick={() => delReport(r.id)} style={{ background: "transparent", border: "none", color: "#ef4444", fontSize: 11, cursor: "pointer", fontWeight: 600 }}>🗑️ Delete</button>
+                         </>
+                       )}
+                     </div>
+                  </div>
                 </div>
               ))}
             </div>
