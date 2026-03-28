@@ -57,7 +57,7 @@ const INIT = {
   reports: [],
   alerts: [],
   holidays: [],
-  config: { hrBudget: 0, email: "", phone: "", pin: "1205" },
+  config: { hrBudgets: { "I-Genie": 7000, "Lenovo": 10000, "Persistent": 10000 }, email: "", phone: "", pin: "1205" },
 };
 const SK = "projecthub_data";
 const PC = { "I-Genie": "#a78bfa", Lenovo: "#fb923c", Persistent: "#34d399" };
@@ -76,6 +76,11 @@ function loadFromStorage() {
       const d = JSON.parse(raw);
       if (d && d.employees) {
         if (!d.config) d.config = { ...INIT.config };
+        if (d.config.hrBudget !== undefined && !d.config.hrBudgets) {
+          d.config.hrBudgets = { "I-Genie": d.config.hrBudget, "Lenovo": 10000, "Persistent": 10000 };
+          delete d.config.hrBudget;
+        }
+        if (!d.config.hrBudgets) d.config.hrBudgets = { ...INIT.config.hrBudgets };
         if (d.config.pin === "1234" || !d.config.pin) d.config.pin = "1205";
         if (!d.alerts) d.alerts = [];
         if (!d.holidays) d.holidays = [];
@@ -663,16 +668,17 @@ function OwnerPanel({ D, save, pushAlert, notify, setRole, toast }) {
     const ny = m === 12 ? y + 1 : y;
     const MN = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     const totalNet = E.reduce((s, e) => s + calcPay(e, mo).net, 0);
-    const hr = D.config?.hrBudget || 0;
-    const grand = totalNet + hr;
+    const hrBudgets = D.config?.hrBudgets || {};
+    const totalHR = Object.values(hrBudgets).reduce((a, b) => a + (Number(b) || 0), 0);
+    const grand = totalNet + totalHR;
     let nd = pushAlert(D, {
       type: "payment", icon: "💰",
       title: `Payment Reminder — 15th ${MN[nm]} ${ny}`,
-      msg: `Total: ${fmt(grand)} for ${E.length} people.\n${PROJECTS.map((p) => `• ${p}: ${fmt(E.filter((e) => e.project === p).reduce((s, e) => s + calcPay(e, mo).net, 0))}`).join("\n")}${hr > 0 ? `\n• HR: ${fmt(hr)}` : ""}`,
+      msg: `Total: ${fmt(grand)} for ${E.length} people.\n${PROJECTS.map((p) => `• ${p}: ${fmt(E.filter((e) => e.project === p).reduce((s, e) => s + calcPay(e, mo).net, 0) + (Number(hrBudgets[p]) || 0))} (incl. HR)`).join("\n")}`,
       sev: "high", project: "All", hasEmail: true, hasSMS: true,
       emailSubject: `[ProjectHub] PAYMENT DUE 15th ${MN[nm]} ${ny} — ${fmt(grand)}`,
-      emailBody: `Hi,\n\nSalary due on 15th ${MN[nm]} ${ny}.\n\nMonth: ${MN[m]} ${y}\n\n${E.map((e) => { const s = calcPay(e, mo); return `${e.name} (${e.project}): ${fmt(s.net)} [${s.effective}/${s.empWD} days]`; }).join("\n")}${hr > 0 ? `\n\nHR Budget: ${fmt(hr)}` : ""}\n\nGRAND TOTAL: ${fmt(grand)}\n\n— ProjectHub`,
-      smsBody: `ProjectHub: Payment due 15th ${MN[nm]}. Total: ${fmt(grand)} for ${E.length} people.`,
+      emailBody: `Hi,\n\nSalary due on 15th ${MN[nm]} ${ny}.\n\nMonth: ${MN[m]} ${y}\n\n${E.map((e) => { const s = calcPay(e, mo); return `${e.name} (${e.project}): ${fmt(s.net)} [${s.effective}/${s.empWD} days]`; }).join("\n")}\n\nHR Budgets:\n${PROJECTS.map(p => `• ${p}: ${fmt(hrBudgets[p] || 0)}`).join("\n")}\n\nGRAND TOTAL: ${fmt(grand)}\n\n— ProjectHub`,
+      smsBody: `ProjectHub: Payment due 15th ${MN[nm]}. Total: ${fmt(grand)}. All projects breakdown updated in dashboard.`,
     });
     save(nd);
     notify("Reminder created!");
@@ -928,7 +934,10 @@ function OwnerPanel({ D, save, pushAlert, notify, setRole, toast }) {
   // Payroll
   const rPay = () => {
     const [y, m] = mo.split("-").map(Number); const wd = workDays(y, m, hols);
-    const all = E.map((e) => ({ e, s: calcPay(e, mo) })); const totalNet = all.reduce((s, x) => s + x.s.net, 0); const hr = D.config?.hrBudget || 0; const grand = totalNet + hr;
+    const all = E.map((e) => ({ e, s: calcPay(e, mo) })); const totalNet = all.reduce((s, x) => s + x.s.net, 0);
+    const hrBudgets = D.config?.hrBudgets || {};
+    const totalHR = Object.values(hrBudgets).reduce((a, b) => a + (Number(b) || 0), 0);
+    const grand = totalNet + totalHR;
     return (<div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
         <input type="month" value={mo} onChange={(e) => setMo(e.target.value)} style={inputStyle} />
@@ -939,16 +948,17 @@ function OwnerPanel({ D, save, pushAlert, notify, setRole, toast }) {
         </div>
       </div>
       <div style={{ background: "linear-gradient(135deg,#1e1b4b,#0f1520 70%)", borderRadius: 12, padding: 18, marginBottom: 16, border: "1px solid #1c2640", display: "flex", justifyContent: "space-around", textAlign: "center", flexWrap: "wrap", gap: 12 }}>
-        {[["Working Days", wd, "#6366f1"], ["Earned", fmt(totalNet), "#22c55e"], hr > 0 && ["HR", fmt(hr), "#ec4899"], ["Total", fmt(grand), "#eab308"]].filter(Boolean).map(([l, v, c], i) => (<div key={i}><div style={{ fontSize: 9, color: "#5a6b85", textTransform: "uppercase", letterSpacing: 1 }}>{l}</div><div style={{ fontSize: 22, fontWeight: 700, color: c, marginTop: 3 }}>{v}</div></div>))}
+        {[["Working Days", wd, "#6366f1"], ["Earned", fmt(totalNet), "#22c55e"], totalHR > 0 && ["HR Total", fmt(totalHR), "#ec4899"], ["Total", fmt(grand), "#eab308"]].filter(Boolean).map(([l, v, c], i) => (<div key={i}><div style={{ fontSize: 9, color: "#5a6b85", textTransform: "uppercase", letterSpacing: 1 }}>{l}</div><div style={{ fontSize: 22, fontWeight: 700, color: c, marginTop: 3 }}>{v}</div></div>))}
       </div>
       {PROJECTS.map((pr) => {
-        const pe = all.filter((x) => x.e.project === pr); if (!pe.length) return null; const pt = pe.reduce((s, x) => s + x.s.net, 0); const hs = hr > 0 ? Math.round(hr / PROJECTS.length) : 0;
+        const pe = all.filter((x) => x.e.project === pr); if (!pe.length) return null; const pt = pe.reduce((s, x) => s + x.s.net, 0);
+        const hrVal = Number(D.config?.hrBudgets?.[pr]) || 0;
         return (<Cd key={pr} s={{ marginBottom: 12 }}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
           <h4 style={{ margin: 0, color: "#e8edf5", fontSize: 13 }}><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: PC[pr], marginRight: 6 }} />{pr} ({pe.length})</h4>
-          <span style={{ fontSize: 12, color: "#8899b4" }}>Pay: <strong style={{ color: "#22c55e" }}>{fmt(pt)}</strong>{hs > 0 && <span style={{ color: "#5a6b85", fontSize: 10 }}> +HR {fmt(hs)}</span>}</span>
+          <span style={{ fontSize: 12, color: "#8899b4" }}>Pay: <strong style={{ color: "#22c55e" }}>{fmt(pt)}</strong>{hrVal > 0 && <span style={{ color: "#ec4899", fontSize: 10, fontWeight: 600 }}> +HR {fmt(hrVal)}</span>}</span>
         </div>
           <div style={{ overflowX: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
-            <thead><tr>{["Name", "Gross", "Days", "Attendance", "Per Day", "Net", "Flags"].map((h) => <th key={h} style={{ padding: "6px 8px", textAlign: "left", color: "#5a6b85", fontSize: 9, textTransform: "uppercase", borderBottom: "1px solid #1c2640" }}>{h}</th>)}</tr></thead>
+            <thead><tr>{["Name", "Gross", "Days", "Logs", "P/Day", "Net", "!"].map((h) => <th key={h} style={{ padding: "6px 5px", textAlign: "left", color: "#5a6b85", fontSize: 8, textTransform: "uppercase", borderBottom: "1px solid #1c2640" }}>{h}</th>)}</tr></thead>
             <tbody>{pe.map(({ e: emp, s: sal }) => (<tr key={emp.id} style={{ borderBottom: "1px solid #1c2640" }}>
               <td style={{ padding: "8px", color: "#e8edf5", fontWeight: 500, fontSize: 12 }}>{emp.name}</td>
               <td style={{ padding: "8px", color: "#8899b4" }}>{fmt(emp.salary)}</td>
@@ -957,20 +967,37 @@ function OwnerPanel({ D, save, pushAlert, notify, setRole, toast }) {
                 {sal.present > 0 && <span style={{ color: SC.present }}>{sal.present}P</span>}{sal.wfh > 0 && <span style={{ color: SC.wfh }}>{sal.wfh}W</span>}{sal.halfday > 0 && <span style={{ color: SC.halfday }}>{sal.halfday}H</span>}{sal.absent > 0 && <span style={{ color: SC.absent }}>{sal.absent}A</span>}{sal.leave > 0 && <span style={{ color: SC.leave }}>{sal.leave}L</span>}
               </div><div style={{ height: 3, background: "#1c2640", borderRadius: 2, marginTop: 3, width: 55 }}><div style={{ height: "100%", width: `${sal.attPct}%`, background: sal.attPct >= 90 ? "#22c55e" : sal.attPct >= 70 ? "#eab308" : "#ef4444", borderRadius: 2 }} /></div></td>
               <td style={{ padding: "8px", color: "#8899b4" }}>{fmt(sal.perDay)}</td>
-              <td style={{ padding: "8px", color: "#22c55e", fontWeight: 700 }}>{fmt(sal.net)}</td>
-              <td style={{ padding: "8px" }}><div style={{ display: "flex", gap: 3 }}>
-                {sal.isProRata && <Bg color="#06b6d4" s={{ fontSize: 8, padding: "1px 5px" }}>Pro-rata</Bg>}
-                {sal.attPct > 0 && sal.attPct < 70 && <Bg color="#ef4444" s={{ fontSize: 8, padding: "1px 5px" }}>Low</Bg>}
+              <td style={{ padding: "8px", color: "#22c55e", fontWeight: 700 }}>
+                {fmt(sal.net)}
+                {sal.isProRata && <div style={{ fontSize: 7, color: "#06b6d4", textTransform: "uppercase", marginTop: 2 }}>Pro-rata</div>}
+              </td>
+              <td style={{ padding: "8px" }}><div style={{ display: "flex", gap: 3, alignItems: "center" }}>
+                {sal.attPct < 70 && <span title="Low attendance" style={{ color: "#ef4444", fontSize: 10 }}>⚠️</span>}
+                {sal.absent > 3 && <Bg color="#ef4444" s={{ fontSize: 8, padding: "1px 5px" }}>Absences</Bg>}
+                {sal.effective === 0 && <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#ef4444", display: "inline-block" }} title="No logs yet" />}
               </div></td>
             </tr>))}</tbody>
           </table></div></Cd>);
       })}
       {modal === "payConf" && <Mod title="⚙ Payroll Config" onClose={() => setModal(null)}>
-        <Inp label="Your Email" defaultValue={D.config?.email || ""} id="cfe" placeholder="deepak@company.com" />
-        <Inp label="Phone (SMS)" defaultValue={D.config?.phone || ""} id="cfp" placeholder="+91 98765 43210" />
-        <Inp label="HR Budget (₹/month)" type="number" defaultValue={D.config?.hrBudget || ""} id="cfh" />
+        <Inp label="Admin Email" defaultValue={D.config?.email || ""} id="cfe" />
         <Inp label="Admin PIN" defaultValue={D.config?.pin || "1205"} id="cfpin" />
-        <Bt onClick={() => { save({ ...D, config: { ...D.config, email: document.getElementById("cfe").value, phone: document.getElementById("cfp").value, hrBudget: Number(document.getElementById("cfh").value) || 0, pin: document.getElementById("cfpin").value || "1205" } }); setModal(null); notify("Saved!"); }} s={{ width: "100%" }}>Save Config</Bt>
+        <div style={{ marginTop: 16, padding: "12px 0", borderTop: "1px solid #1c2640" }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#5a6b85", marginBottom: 10, textTransform: "uppercase" }}>Project HR Budgets (₹/month)</div>
+          <div style={{ display: "grid", gap: 10 }}>
+            {PROJECTS.map(p => (
+              <div key={p} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ flex: 1, fontSize: 12, color: "#8899b4" }}>{p}</div>
+                <input type="number" defaultValue={D.config?.hrBudgets?.[p] || 0} id={`hr-${p}`} style={{ ...inputStyle, width: 100, padding: "6px 10px", fontSize: 12 }} />
+              </div>
+            ))}
+          </div>
+        </div>
+        <Bt onClick={() => {
+          const bud = {}; PROJECTS.forEach(p => bud[p] = Number(document.getElementById(`hr-${p}`).value) || 0);
+          save({ ...D, config: { ...D.config, email: document.getElementById("cfe").value, hrBudgets: bud, pin: document.getElementById("cfpin").value || "1205" } });
+          setModal(null); notify("Config Saved!");
+        }} s={{ width: "100%", marginTop: 16 }}>Save Config</Bt>
       </Mod>}
     </div>);
   };
