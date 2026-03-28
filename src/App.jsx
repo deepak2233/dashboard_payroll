@@ -401,22 +401,89 @@ function CandidatePortal({ D, save, candId, pushAlert, notify, setRole, setCandI
     notify(`Marked ${label} — Admin notified`);
   };
 
-  const submitReport = (r) => {
-    const today = todayStr();
-    const id = uid();
-    const nd = { ...D, reports: [...(D.reports || []), { ...r, id, empId: candId, date: fmtD(today), ts: new Date().toISOString(), status: "pending" }] };
+  const id = r.id || uid();
+  let nd;
+  if (r.id) {
+    // Update existing
+    nd = { ...D, reports: D.reports.map(rep => rep.id === r.id ? { ...r, status: r.status === "review" ? "pending" : r.status } : rep) };
+  } else {
+    // New submission
+    nd = { ...D, reports: [...(D.reports || []), { ...r, id, empId: candId, date: fmtD(today), ts: new Date().toISOString(), status: "pending" }] };
+  }
 
-    // Alert for owner
-    const emp = D.employees.find(e => e.id === candId);
+  // Alert for owner (only for new or significantly updated)
+  const emp = D.employees.find(e => e.id === candId);
+  nd.alerts = [{
+    id: uid(), ts: new Date().toISOString(), type: 'report', icon: '📝',
+    title: `${r.id ? 'Updated' : 'New'} Report: ${emp.name}`,
+    msg: r.attachment ? `Attached: ${r.attachmentName}` : `Summary: ${r.summary.slice(0, 100)}...`,
+    read: false
+  }, ...(nd.alerts || [])];
+
+  save(nd);
+  notify(r.id ? "Report updated!" : "Report submitted!");
+};
+
+const CandAttendance = () => {
+  const [y, m] = mo.split("-").map(Number);
+  const dim = new Date(y, m, 0).getDate();
+  const DN = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const holSet = new Set(hols);
+  const stats = getMyStats(mo);
+  const wd = workDays(y, m, hols);
+  const days = Array.from({ length: dim }, (_, i) => {
+    const dt = new Date(y, m - 1, i + 1);
+    const ds = `${y}-${String(m).padStart(2, "0")}-${String(i + 1).padStart(2, "0")}`;
+    return { date: ds, day: i + 1, dn: DN[dt.getDay()], isWE: dt.getDay() === 0 || dt.getDay() === 6, isHol: holSet.has(ds) };
+  });
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18, flexWrap: "wrap", gap: 10 }}>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <input type="month" value={mo} onChange={(e) => setMo(e.target.value)} style={inputStyle} />
+          <span style={{ fontSize: 11, color: "#5a6b85" }}>{wd} working days</span>
+        </div>
+        <div style={{ display: "flex", gap: 8, fontSize: 10 }}>
+          {Object.entries(SC).map(([k, c]) => <span key={k} style={{ display: "flex", alignItems: "center", gap: 3 }}><span style={{ width: 9, height: 9, borderRadius: 2, background: c }} />{k}</span>)}
+        </div>
+      </div>
+      <div style={{ display: "flex", gap: 10, marginBottom: 18, flexWrap: "wrap" }}>
+        {[["Present", stats.present, SC.present], ["WFH", stats.wfh, SC.wfh], ["Half Day", stats.halfday, SC.halfday], ["Leave", stats.leave, SC.leave], ["Absent", stats.absent, SC.absent], ["Effective", stats.effective, "#6366f1"]].map(([l, v, c]) => (
+          <div key={l} style={{ background: "#0f1520", border: "1px solid #1c2640", borderRadius: 10, padding: "10px 16px", textAlign: "center", minWidth: 70 }}>
+            <div style={{ fontSize: 22, fontWeight: 700, color: c }}>{v}</div>
+            <div style={{ fontSize: 10, color: "#5a6b85", marginTop: 2 }}>{l}</div>
+          </div>
+        ))}
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 6 }}>
+        {DN.map((d) => <div key={d} style={{ textAlign: "center", fontSize: 10, color: "#5a6b85", fontWeight: 600, padding: 4 }}>{d}</div>)}
+        {Array.from({ length: new Date(y, m - 1, 1).getDay() }, (_, i) => <div key={`e${i}`} />)}
+        {days.map((d) => {
+          const v = D.attendance[`${candId}_${d.date}`];
+          const isToday = d.date === todayStr();
+          const isOff = d.isWE || d.isHol;
+          return (
+            <button key={d.day} onClick={() => { if (!d.isWE) { const nx = SCYCLE[(SCYCLE.indexOf(v) + 1) % SCYCLE.length]; markAtt(d.date, nx); } }}
+              style={{ padding: "10px 4px", borderRadius: 10, border: isToday ? "2px solid #6366f1" : `1px solid ${isOff ? "#1c264040" : "#1c2640"}`, background: v ? SC[v] + "15" : isOff ? "#0a0e17" : "#0f1520", cursor: d.isWE ? "default" : "pointer", textAlign: "center", fontFamily: "inherit", opacity: isOff && !v ? 0.35 : 1 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: v ? SC[v] : "#e8edf5" }}>{d.day}</div>
+              <div style={{ fontSize: 9, marginTop: 2, fontWeight: 700, color: v ? SC[v] : d.isHol ? "#ec4899" : "#5a6b85" }}>{v ? SL[v] : d.isHol ? "HOL" : ""}</div>
+  const submitReport = (r) => {
+    const id = r.id || uid();
+    let nd;
+    if (r.id) {
+      nd = { ...D, reports: D.reports.map(rep => rep.id === r.id ? { ...r, status: r.status === "review" ? "pending" : r.status } : rep) };
+    } else {
+      nd = { ...D, reports: [...(D.reports || []), { ...r, id, empId: candId, date: fmtD(today), ts: new Date().toISOString(), status: "pending" }] };
+    }
     nd.alerts = [{
       id: uid(), ts: new Date().toISOString(), type: 'report', icon: '📝',
-      title: `Report: ${emp.name}`,
+      title: `${r.id ? 'Updated' : 'New'} Report: ${emp.name}`,
       msg: r.attachment ? `Attached: ${r.attachmentName}` : `Summary: ${r.summary.slice(0, 100)}...`,
       read: false
     }, ...(nd.alerts || [])];
-
     save(nd);
-    notify("Report submitted!");
+    notify(r.id ? "Report updated!" : "Report submitted!");
   };
 
   const CandAttendance = () => {
@@ -476,6 +543,7 @@ function CandidatePortal({ D, save, candId, pushAlert, notify, setRole, setCandI
     const [f, sF] = useState({ project: emp.project, weekOf: getWeekStart(), summary: "", blockers: "", nextWeek: "", hours: "", attachment: null, attachmentName: "" });
     const [submitted, setSubmitted] = useState(false);
     const [mode, setMode] = useState("write"); // 'write' or 'upload'
+    const [editId, setEditId] = useState(null);
     const myReports = (D.reports || []).filter((r) => r.empId === candId);
 
     const handleFile = (e) => {
@@ -499,7 +567,7 @@ function CandidatePortal({ D, save, candId, pushAlert, notify, setRole, setCandI
     return (
       <div>
         <div style={{ background: "#0f1520", border: "1px solid #1c2640", borderRadius: 12, padding: 20, marginBottom: 20 }}>
-          <h4 style={{ margin: "0 0 14px", color: "#e8edf5", fontSize: 14 }}>Submit Weekly Report</h4>
+          <h4 style={{ margin: "0 0 14px", color: "#e8edf5", fontSize: 14 }}>{editId ? "Edit Report" : "Submit Weekly Report"}</h4>
 
           <div style={{ display: "flex", gap: 8, marginBottom: 20, background: "#0a0e17", padding: 4, borderRadius: 8 }}>
             <button onClick={() => setMode("write")} style={{ flex: 1, padding: "8px", borderRadius: 6, border: "none", background: mode === "write" ? "#1c2640" : "transparent", color: mode === "write" ? "#fff" : "#8899b4", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>✍️ Write Report</button>
@@ -529,28 +597,38 @@ function CandidatePortal({ D, save, candId, pushAlert, notify, setRole, setCandI
             </div>
           )}
 
-          <button onClick={() => { if ((f.summary || f.attachment) && f.weekOf) { submitReport(f); setSubmitted(true); } }} disabled={(!f.summary && !f.attachment) || !f.weekOf}
-            style={{ width: "100%", padding: "12px", borderRadius: 8, border: "none", background: "#6366f1", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", opacity: (f.summary || f.attachment) && f.weekOf ? 1 : 0.5 }}>📤 Submit Report</button>
+          <div style={{ display: "flex", gap: 10 }}>
+            <button onClick={() => { if ((f.summary || f.attachment) && f.weekOf) { submitReport(f); setSubmitted(true); setEditId(null); } }} disabled={(!f.summary && !f.attachment) || !f.weekOf}
+              style={{ flex: 2, padding: "12px", borderRadius: 8, border: "none", background: "#6366f1", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", opacity: (f.summary || f.attachment) && f.weekOf ? 1 : 0.5 }}>{editId ? "💾 Update Report" : "📤 Submit Report"}</button>
+            {editId && <button onClick={() => { setEditId(null); sF({ project: emp.project, weekOf: getWeekStart(), summary: "", blockers: "", nextWeek: "", hours: "", attachment: null, attachmentName: "" }); }} style={{ flex: 1, padding: "12px", borderRadius: 8, border: "1px solid #ef444440", background: "transparent", color: "#ef4444", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>}
+          </div>
         </div>
         {myReports.length > 0 && (
-          <div>
+          <div style={{ marginTop: 20, borderTop: "1px solid #1c2640", paddingTop: 20 }}>
             <h4 style={{ color: "#e8edf5", fontSize: 14, margin: "0 0 12px" }}>My Past Reports ({myReports.length})</h4>
-            {[...myReports].reverse().slice(0, 5).map((r) => (
-              <div key={r.id} style={{ background: "#0f1520", border: "1px solid #1c2640", borderRadius: 10, padding: 14, marginBottom: 8 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                  <div style={{ fontSize: 11, color: "#e8edf5", fontWeight: 600 }}>Week of {r.weekOf}</div>
-                  <div style={{ fontSize: 9, color: (r.status === "approved" ? "#22c55e" : r.status === "review" ? "#eab308" : "#8899b4"), fontWeight: 700, textTransform: "uppercase", background: (r.status === "approved" ? "#22c55e15" : r.status === "review" ? "#eab30815" : "#1c2640"), padding: "2px 6px", borderRadius: 4 }}>{r.status || "pending"}</div>
+            <div style={{ maxHeight: 400, overflowY: "auto", paddingRight: 4 }}>
+              {[...myReports].reverse().slice(0, 10).map((r) => (
+                <div key={r.id} style={{ background: "#0f1520", border: "1px solid #1c2640", borderRadius: 10, padding: 14, marginBottom: 8 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                    <div style={{ fontSize: 11, color: "#e8edf5", fontWeight: 600 }}>Week of {r.weekOf}</div>
+                    <div style={{ fontSize: 9, color: (r.status === "approved" ? "#22c55e" : r.status === "review" ? "#eab308" : "#8899b4"), fontWeight: 700, textTransform: "uppercase", background: (r.status === "approved" ? "#22c55e15" : r.status === "review" ? "#eab30815" : "#1c2640"), padding: "2px 6px", borderRadius: 4 }}>{r.status || "pending"}</div>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                     <span style={{ fontSize: 10, color: "#5a6b85" }}>{r.date}</span>
+                     {r.status !== "approved" && (
+                       <button onClick={() => { setEditId(r.id); sF({ ...r }); setMode(r.attachment ? "upload" : "write"); window.scrollTo({ top: 0, behavior: 'smooth' }); }} style={{ background: "transparent", border: "none", color: "#6366f1", fontSize: 11, cursor: "pointer", fontWeight: 600 }}>✏️ Edit</button>
+                     )}
+                  </div>
+                  <p style={{ margin: "8px 0 0", fontSize: 12, color: "#8899b4", lineHeight: 1.5 }}>{r.summary?.slice(0, 200)}{r.summary?.length > 200 ? "..." : ""}</p>
                 </div>
-                <span style={{ fontSize: 10, color: "#5a6b85" }}>{r.date}</span>
-                <p style={{ margin: 0, fontSize: 12, color: "#8899b4", lineHeight: 1.5 }}>{r.summary?.slice(0, 200)}{r.summary?.length > 200 ? "..." : ""}</p>
-              </div>
-            ))}
+              ))}
+            </div>
+            {myReports.length > 10 && <div style={{ textAlign: "center", fontSize: 11, color: "#5a6b85", marginTop: 10 }}>Showing recent 10 reports</div>}
           </div>
         )}
       </div>
     );
   };
-
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh", fontFamily: "'DM Sans',sans-serif", background: "#080c14", color: "#e8edf5" }}>
