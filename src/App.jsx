@@ -57,6 +57,7 @@ const INIT = {
   reports: [],
   alerts: [],
   holidays: [],
+  attStatus: {},
   config: { hrBudgets: { "I-Genie": 7000, "Lenovo": 10000, "Persistent": 10000 }, email: "", phone: "", pin: "1205" },
 };
 const SK = "projecthub_data";
@@ -85,6 +86,7 @@ function loadFromStorage() {
         if (!d.alerts) d.alerts = [];
         if (!d.holidays) d.holidays = [];
         if (!d.attendance) d.attendance = {};
+        if (!d.attStatus) d.attStatus = {};
         if (!d.reports) d.reports = [];
         d.employees = (d.employees || []).map((e) => ({
           ...e,
@@ -376,7 +378,11 @@ function CandidatePortal({ D, save, candId, pushAlert, notify, setRole, setCandI
     for (let d = 1; d <= dim; d++) {
       const ds = `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
       const v = D.attendance[`${candId}_${ds}`];
-      if (v === "present") p++; else if (v === "absent") a++; else if (v === "leave") l++; else if (v === "halfday") h++; else if (v === "wfh") w++;
+      const s = D.attStatus[`${candId}_${ds}`];
+      const isApp = !s || s === "approved";
+      if (isApp) {
+        if (v === "present") p++; else if (v === "absent") a++; else if (v === "leave") l++; else if (v === "halfday") h++; else if (v === "wfh") w++;
+      }
     }
     return { present: p, absent: a, leave: l, halfday: h, wfh: w, effective: p + w + h * 0.5 };
   };
@@ -384,8 +390,10 @@ function CandidatePortal({ D, save, candId, pushAlert, notify, setRole, setCandI
   const markAtt = (date, status) => {
     const att = { ...D.attendance };
     const k = `${candId}_${date}`;
-    if (!status) delete att[k]; else att[k] = status;
-    let nd = { ...D, attendance: att };
+    let nd = { ...D };
+    if (!status) { delete att[k]; if (nd.attStatus) delete nd.attStatus[k]; }
+    else { att[k] = status; if (!nd.attStatus) nd.attStatus = {}; nd.attStatus[k] = "pending"; }
+    nd.attendance = att;
     const label = status ? status.charAt(0).toUpperCase() + status.slice(1) : "Cleared";
     nd = pushAlert(nd, {
       type: "cand_attendance", icon: status === "present" ? "✅" : status === "absent" ? "🚨" : status === "leave" ? "📋" : status === "wfh" ? "🏠" : "📌",
@@ -463,11 +471,12 @@ function CandidatePortal({ D, save, candId, pushAlert, notify, setRole, setCandI
           {Array.from({ length: new Date(y, m - 1, 1).getDay() }, (_, i) => <div key={`e${i}`} />)}
           {days.map((d) => {
             const v = D.attendance[`${candId}_${d.date}`];
+            const s = D.attStatus[`${candId}_${d.date}`];
             const isToday = d.date === todayStr();
             const isOff = d.isWE || d.isHol;
             return (
               <button key={d.day} onClick={() => { if (!d.isWE) { const nx = SCYCLE[(SCYCLE.indexOf(v) + 1) % SCYCLE.length]; markAtt(d.date, nx); } }}
-                style={{ padding: "10px 4px", borderRadius: 10, border: isToday ? "2px solid #6366f1" : `1px solid ${isOff ? "#1c264040" : "#1c2640"}`, background: v ? SC[v] + "15" : isOff ? "#0a0e17" : "#0f1520", cursor: d.isWE ? "default" : "pointer", textAlign: "center", fontFamily: "inherit", opacity: isOff && !v ? 0.35 : 1 }}>
+                style={{ padding: "10px 4px", borderRadius: 10, border: isToday ? "2px solid #6366f1" : `1px solid ${isOff ? "#1c264040" : "#1c2640"}`, background: v ? SC[v] + "15" : isOff ? "#0a0e17" : "#0f1520", cursor: d.isWE ? "default" : "pointer", textAlign: "center", fontFamily: "inherit", opacity: (isOff && !v) ? 0.35 : (v && s === "pending") ? 0.6 : 1 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: v ? SC[v] : "#e8edf5" }}>{d.day}</div>
                 <div style={{ fontSize: 9, marginTop: 2, fontWeight: 700, color: v ? SC[v] : d.isHol ? "#ec4899" : "#5a6b85" }}>{v ? SL[v] : d.isHol ? "HOL" : ""}</div>
               </button>
@@ -646,8 +655,10 @@ function OwnerPanel({ D, save, pushAlert, notify, setRole, toast }) {
   const markAtt = (eid, date, status) => {
     const att = { ...D.attendance };
     const k = `${eid}_${date}`;
-    if (!status) delete att[k]; else att[k] = status;
-    save({ ...D, attendance: att });
+    let nd = { ...D };
+    if (!status) { delete att[k]; if (nd.attStatus) delete nd.attStatus[k]; }
+    else { att[k] = status; if (!nd.attStatus) nd.attStatus = {}; nd.attStatus[k] = "approved"; }
+    save({ ...nd, attendance: att });
   };
 
   const addHoliday = (date, label) => { save({ ...D, holidays: [...(D.holidays || []), { date, label, id: uid() }] }); notify("Holiday added"); };
@@ -680,7 +691,11 @@ function OwnerPanel({ D, save, pushAlert, notify, setRole, toast }) {
     for (let d = 1; d <= dim; d++) {
       const ds = `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
       const v = D.attendance[`${eid}_${ds}`];
-      if (v === "present") p++; else if (v === "absent") a++; else if (v === "leave") l++; else if (v === "halfday") h++; else if (v === "wfh") w++;
+      const s = D.attStatus[`${eid}_${ds}`];
+      const isApp = !s || s === "approved";
+      if (isApp) {
+        if (v === "present") p++; else if (v === "absent") a++; else if (v === "leave") l++; else if (v === "halfday") h++; else if (v === "wfh") w++;
+      }
     }
     return { present: p, absent: a, leave: l, halfday: h, wfh: w, effective: p + w + h * 0.5 };
   };
@@ -735,12 +750,14 @@ function OwnerPanel({ D, save, pushAlert, notify, setRole, toast }) {
 
   // Dashboard
   const rDash = () => {
-    const td = todayStr(); const tp = E.filter((e) => { const s = D.attendance[`${e.id}_${td}`]; return s === "present" || s === "wfh"; }).length;
+    const td = todayStr();
+    const tp = E.filter(e => { const v = D.attendance[`${e.id}_${td}`]; const s = D.attStatus[`${e.id}_${td}`]; return (v === "present" || v === "wfh") && (!s || s === "approved"); }).length;
+    const pendAtt = Object.values(D.attStatus || {}).filter(s => s === "pending").length;
     const unread = (D.alerts || []).filter((a) => !a.read).length;
     return (<div>
       <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 22 }}>
-        {[["People", E.length, "#6366f1"], ["Present", tp, "#22c55e"], ["Payroll", fmt(E.reduce((s, e) => s + (e.salary || 0), 0)), "#eab308"], ["Alerts", unread, unread ? "#ef4444" : "#5a6b85"]].map(([l, v, c], i) => (
-          <Cd key={i} s={{ flex: 1, minWidth: 140 }}><div style={{ fontSize: 10, color: "#5a6b85", textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>{l}</div><div style={{ fontSize: 26, fontWeight: 700, color: c }}>{v}</div></Cd>
+        {[["People", E.length, "#6366f1"], ["Present", tp, "#22c55e"], ["Payroll", fmt(E.reduce((s, e) => s + (e.salary || 0), 0)), "#eab308"], ["Alerts", unread, unread ? "#ef4444" : "#5a6b85"], ["Pending Att", pendAtt, pendAtt ? "#f59e0b" : "#5a6b85"]].map(([l, v, c], i) => (
+          <Cd key={i} s={{ flex: 1, minWidth: 120 }}><div style={{ fontSize: 10, color: "#5a6b85", textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>{l}</div><div style={{ fontSize: 26, fontWeight: 700, color: c }}>{v}</div></Cd>
         ))}
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
@@ -755,6 +772,18 @@ function OwnerPanel({ D, save, pushAlert, notify, setRole, toast }) {
       {E.length > 0 && <Cd s={{ marginTop: 16 }}><h4 style={{ margin: "0 0 10px", color: "#e8edf5", fontSize: 14 }}>🔑 Access Codes <span style={{ fontWeight: 400, fontSize: 11, color: "#5a6b85" }}>(share with team)</span></h4>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(200px,1fr))", gap: 8 }}>
           {E.map((e) => <div key={e.id} style={{ padding: "8px 12px", background: "#151d2e", borderRadius: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}><span style={{ fontSize: 12, color: "#e8edf5" }}>{e.name}</span><code style={{ fontSize: 13, color: "#6366f1", fontWeight: 700, background: "#6366f115", padding: "2px 8px", borderRadius: 4 }}>{e.code || e.id.slice(0, 4)}</code></div>)}
+        </div>
+      </Cd>}
+      {pendAtt > 0 && <Cd s={{ marginTop: 16, border: "1px solid #f59e0b40" }}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}><h4 style={{ margin: 0, color: "#f59e0b", fontSize: 14 }}>⏳ Pending Attendance Approval ({pendAtt})</h4><Bt v="ok" onClick={() => { const nd = { ...D, attStatus: { ...D.attStatus } }; Object.keys(nd.attStatus).forEach(k => { if (nd.attStatus[k] === "pending") nd.attStatus[k] = "approved"; }); save(nd); notify("All attendance approved"); }} s={{ fontSize: 11, padding: "5px 12px" }}>Approve All</Bt></div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(220px,1fr))", gap: 8 }}>
+          {Object.keys(D.attStatus || {}).filter(k => D.attStatus[k] === "pending").map(k => {
+            const [eid, dt] = k.split("_"); const e = E.find(x => x.id === eid); if (!e) return null;
+            const val = D.attendance[k];
+            return <div key={k} style={{ padding: "10px", background: "#151d2e", borderRadius: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div><div style={{ fontSize: 12, color: "#e8edf5", fontWeight: 600 }}>{e.name}</div><div style={{ fontSize: 10, color: "#5a6b85" }}>{fmtD(dt)} · <span style={{ color: SC[val] }}>{val}</span></div></div>
+              <div style={{ display: "flex", gap: 6 }}><button onClick={() => { const nd = { ...D, attStatus: { ...D.attStatus, [k]: "approved" } }; save(nd); notify("Approved"); }} style={{ padding: "4px 8px", borderRadius: 4, background: "#22c55e20", color: "#22c55e", border: "none", fontSize: 10, cursor: "pointer" }}>Approve</button></div>
+            </div>
+          })}
         </div>
       </Cd>}
     </div>);
@@ -831,6 +860,7 @@ function OwnerPanel({ D, save, pushAlert, notify, setRole, toast }) {
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <input type="month" value={mo} onChange={(e) => setMo(e.target.value)} style={inputStyle} />
           <span style={{ fontSize: 11, color: "#5a6b85" }}>{wd} days</span>
+          {Object.values(D.attStatus || {}).some(s => s === "pending") && <Bt v="ok" onClick={() => { const nd = { ...D, attStatus: { ...D.attStatus } }; Object.keys(nd.attStatus).forEach(k => { if (nd.attStatus[k] === "pending") nd.attStatus[k] = "approved"; }); save(nd); notify("All approved"); }} s={{ fontSize: 10, padding: "5px 12px" }}>Approve All Pending</Bt>}
           <Bt v="g" s={{ fontSize: 10, padding: "5px 10px" }} onClick={() => setModal("addHol")}>+ Holiday</Bt>
           <button onClick={downloadReport} style={{ background: "#6366f120", border: "1px solid #6366f140", color: "#6366f1", borderRadius: 6, padding: "5px 10px", fontSize: 10, cursor: "pointer", fontWeight: 700, display: "flex", alignItems: "center", gap: 4 }}>📊 Download CSV</button>
 
@@ -864,7 +894,17 @@ function OwnerPanel({ D, save, pushAlert, notify, setRole, toast }) {
           <tbody>{FE.map((emp, ei) => {
             const st = getStats(emp.id, mo); return (<tr key={emp.id} style={{ background: ei % 2 === 0 ? "#0f1520" : "#080c14" }}>
               <td style={{ position: "sticky", left: 0, background: ei % 2 === 0 ? "#0f1520" : "#080c14", zIndex: 1, padding: "6px 10px", fontWeight: 500, color: "#e8edf5", fontSize: 11 }}>{emp.name}<div style={{ fontSize: 8, color: "#5a6b85" }}>{emp.project}</div></td>
-              {dates.map((d) => { const v = D.attendance[`${emp.id}_${d.date}`]; const isOff = d.isWE || d.isHol; return (<td key={d.day} style={{ textAlign: "center", padding: 1, opacity: isOff && !v ? 0.2 : 1 }}><button onClick={() => { if (!d.isWE) markAtt(emp.id, d.date, SCYCLE[(SCYCLE.indexOf(v) + 1) % SCYCLE.length]); }} style={{ width: 22, height: 22, borderRadius: 3, border: d.isHol && !v ? "1px dashed #ec4899" : "none", cursor: d.isWE ? "default" : "pointer", fontSize: 8, fontWeight: 700, background: v ? SC[v] + "20" : "transparent", color: v ? SC[v] : "#5a6b85", padding: 0, lineHeight: "22px" }}>{v ? SL[v] : d.isHol ? "H" : "·"}</button></td>); })}
+              {dates.map((d) => {
+                const v = D.attendance[`${emp.id}_${d.date}`];
+                const s = D.attStatus[`${emp.id}_${d.date}`];
+                const isOff = d.isWE || d.isHol;
+                return (<td key={d.day} style={{ textAlign: "center", padding: 1, opacity: isOff && !v ? 0.2 : 1 }}>
+                  <button onClick={() => { if (!d.isWE) markAtt(emp.id, d.date, SCYCLE[(SCYCLE.indexOf(v) + 1) % SCYCLE.length]); }}
+                    style={{ width: 22, height: 22, borderRadius: 3, border: (s === "pending") ? "1px solid #f59e0b" : d.isHol && !v ? "1px dashed #ec4899" : "none", cursor: d.isWE ? "default" : "pointer", fontSize: 8, fontWeight: 700, background: v ? SC[v] + "20" : "transparent", color: v ? SC[v] : "#5a6b85", padding: 0, lineHeight: "22px", opacity: s === "pending" ? 0.6 : 1 }}>
+                    {v ? SL[v] : d.isHol ? "H" : "·"}
+                  </button>
+                </td>);
+              })}
               <td style={{ textAlign: "center", fontWeight: 700, color: "#22c55e", fontSize: 12, position: "sticky", right: 0, background: ei % 2 === 0 ? "#0f1520" : "#080c14" }}>{st.effective}</td>
             </tr>);
           })}</tbody>
