@@ -67,36 +67,39 @@ const SL = { present: "P", absent: "A", leave: "L", halfday: "\u00BD", wfh: "W" 
 const SCYCLE = [undefined, "present", "absent", "leave", "halfday", "wfh"];
 
 /* ── Storage helpers (localStorage only) ── */
+function migrate(d) {
+  if (!d || !d.employees) return d;
+  if (!d.config) d.config = { ...INIT.config };
+  if (d.config.hrBudget !== undefined && !d.config.hrBudgets) {
+    d.config.hrBudgets = { "I-Genie": d.config.hrBudget, "Lenovo": 10000, "Persistent": 10000 };
+    delete d.config.hrBudget;
+  }
+  if (!d.config.hrBudgets) d.config.hrBudgets = { ...INIT.config.hrBudgets };
+  if (d.config.pin === "1234" || !d.config.pin) d.config.pin = "1205";
+  if (!d.alerts) d.alerts = [];
+  if (!d.holidays) d.holidays = [];
+  if (!d.attendance) d.attendance = {};
+  if (!d.attStatus) d.attStatus = {};
+  if (!d.reports) d.reports = [];
+  d.employees = (d.employees || []).map((e) => ({
+    ...e,
+    salary: e.salary || e.monthlySalary || 0,
+    code: e.code || uid().slice(0, 4),
+  }));
+  return d;
+}
+
+/* ── Storage helpers (localStorage only) ── */
 function loadFromStorage() {
-  // Try multiple keys for migration
   const keys = [SK, "phub4", "phub3", "hub-data-v2", "hub-data"];
   for (const key of keys) {
     try {
       const raw = localStorage.getItem(key);
       if (!raw) continue;
-      const d = JSON.parse(raw);
+      let d = JSON.parse(raw);
       if (d && d.employees) {
-        if (!d.config) d.config = { ...INIT.config };
-        if (d.config.hrBudget !== undefined && !d.config.hrBudgets) {
-          d.config.hrBudgets = { "I-Genie": d.config.hrBudget, "Lenovo": 10000, "Persistent": 10000 };
-          delete d.config.hrBudget;
-        }
-        if (!d.config.hrBudgets) d.config.hrBudgets = { ...INIT.config.hrBudgets };
-        if (d.config.pin === "1234" || !d.config.pin) d.config.pin = "1205";
-        if (!d.alerts) d.alerts = [];
-        if (!d.holidays) d.holidays = [];
-        if (!d.attendance) d.attendance = {};
-        if (!d.attStatus) d.attStatus = {};
-        if (!d.reports) d.reports = [];
-        d.employees = (d.employees || []).map((e) => ({
-          ...e,
-          salary: e.salary || e.monthlySalary || 0,
-          code: e.code || uid().slice(0, 4),
-        }));
-        // Migrate to canonical key
-        if (key !== SK) {
-          try { localStorage.setItem(SK, JSON.stringify(d)); } catch { }
-        }
+        d = migrate(d);
+        if (key !== SK) { try { localStorage.setItem(SK, JSON.stringify(d)); } catch { } }
         return d;
       }
     } catch { }
@@ -140,8 +143,9 @@ export default function App() {
         },
         (payload) => {
           if (payload.new && payload.new.data) {
-            setD(payload.new.data);
-            saveToStorage(payload.new.data);
+            const nd = migrate(payload.new.data);
+            setD(nd);
+            saveToStorage(nd);
           }
         }
       )
@@ -169,8 +173,9 @@ export default function App() {
             setD(loadFromStorage());
           }
         } else if (data && data.data) {
-          setD(data.data);
-          saveToStorage(data.data);
+          const nd = migrate(data.data);
+          setD(nd);
+          saveToStorage(nd);
         }
       } catch (e) {
         console.error("Supabase init error:", e);
