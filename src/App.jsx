@@ -407,7 +407,7 @@ function CandidatePortal({ D, save, candId, pushAlert, notify, setRole, setCandI
     if (r.id) {
       nd = { ...D, reports: D.reports.map(rep => rep.id === r.id ? { ...r, status: r.status === "review" ? "pending" : r.status } : rep) };
     } else {
-      nd = { ...D, reports: [...(D.reports || []), { ...r, id, empId: candId, date: fmtD(today), ts: new Date().toISOString(), status: "pending" }] };
+      nd = { ...D, reports: [...(D.reports || []), { ...r, id, empId: candId, date: fmtD(todayStr()), ts: new Date().toISOString(), status: "pending" }] };
     }
     nd.alerts = [{
       id: uid(), ts: new Date().toISOString(), type: 'report', icon: '📝',
